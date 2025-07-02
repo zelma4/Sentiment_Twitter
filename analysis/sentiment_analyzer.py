@@ -135,15 +135,15 @@ class SentimentAnalyzer:
         try:
             cutoff_time = datetime.utcnow() - timedelta(hours=hours)
             
-            # Group data by hour
+            # Group data by hour (SQLite compatible)
             hourly_data = session.query(
-                func.date_trunc('hour', SentimentData.timestamp).label('hour'),
+                func.strftime('%Y-%m-%d %H:00:00', SentimentData.timestamp).label('hour'),
                 func.avg(SentimentData.sentiment_score).label('avg_sentiment'),
                 func.count(SentimentData.id).label('post_count')
             ).filter(
                 SentimentData.timestamp >= cutoff_time
             ).group_by(
-                func.date_trunc('hour', SentimentData.timestamp)
+                func.strftime('%Y-%m-%d %H:00:00', SentimentData.timestamp)
             ).order_by('hour').all()
             
             trends = []

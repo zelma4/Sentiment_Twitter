@@ -210,8 +210,8 @@ class BitcoinAnalysisBot:
         # Data collection and analysis every hour (reduced from 30 min)
         schedule.every(settings.UPDATE_INTERVAL_MINUTES).minutes.do(self.run_full_cycle)
         
-        # Send hourly summary if there's interesting data
-        schedule.every().hour.at(":30").do(self.send_hourly_summary)
+        # Send hourly summary (every 2 hours to avoid spam)
+        schedule.every(2).hours.do(self.send_hourly_summary)
         
         # Model retraining every week
         schedule.every().sunday.at("02:00").do(self.retrain_model_weekly)
@@ -343,7 +343,7 @@ class BitcoinAnalysisBot:
             return False
 
     def send_hourly_summary(self):
-        """Send hourly summary if there's interesting data"""
+        """Send hourly summary with current status"""
         try:
             if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
                 return False
@@ -356,25 +356,32 @@ class BitcoinAnalysisBot:
                 # Get latest price
                 latest_price = session.query(PriceData).order_by(PriceData.timestamp.desc()).first()
                 
-                # Get recent sentiment data
+                # Get recent sentiment data (last 2 hours)
                 cutoff_time = datetime.utcnow() - timedelta(hours=2)
                 recent_sentiment = session.query(SentimentData).filter(
                     SentimentData.timestamp >= cutoff_time
                 ).all()
                 
-                if not latest_price or not recent_sentiment:
-                    self.logger.info("Not enough data for hourly summary")
-                    return False
-                
                 # Create summary message
-                message = "📊 **Hourly Bitcoin Summary**\n\n"
-                message += f"💰 **Current Price:** ${latest_price.price:,.2f}\n"
+                message = "📊 **Hourly Bitcoin Status**\n\n"
                 
-                # Calculate average sentiment
-                avg_sentiment = sum(s.compound_score for s in recent_sentiment) / len(recent_sentiment)
-                sentiment_emoji = "🚀" if avg_sentiment > 0.1 else "📉" if avg_sentiment < -0.1 else "😐"
-                message += f"💭 **Avg Sentiment:** {sentiment_emoji} {avg_sentiment:.3f}\n"
-                message += f"📈 **Posts Analyzed:** {len(recent_sentiment)}\n\n"
+                if latest_price:
+                    message += f"💰 **Current Price:** ${latest_price.price:,.2f}\n"
+                else:
+                    message += "💰 **Price:** No recent data\n"
+                
+                if recent_sentiment:
+                    # Calculate average sentiment
+                    avg_sentiment = sum(s.compound_score for s in recent_sentiment) / len(recent_sentiment)
+                    sentiment_emoji = "🚀" if avg_sentiment > 0.1 else "📉" if avg_sentiment < -0.1 else "😐"
+                    message += f"💭 **Sentiment:** {sentiment_emoji} {avg_sentiment:.3f}\n"
+                    message += f"📈 **Posts:** {len(recent_sentiment)}\n"
+                else:
+                    message += "💭 **Sentiment:** No recent data\n"
+                    message += "📈 **Posts:** 0 (waiting for data)\n"
+                
+                # Add system status
+                message += f"\n🔧 **Status:** Bot running normally\n"
                 message += f"⏰ **Time:** {datetime.utcnow().strftime('%H:%M UTC')}"
                 
                 success = send_telegram_message(message)
