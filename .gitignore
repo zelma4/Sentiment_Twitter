@@ -43,6 +43,7 @@ models/
 # Logs
 *.log
 logs/
+last_startup.txt
 
 # IDE
 .vscode/

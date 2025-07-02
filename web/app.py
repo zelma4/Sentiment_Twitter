@@ -10,32 +10,41 @@ def create_app():
     
     @app.route('/')
     def dashboard():
-        """Main dashboard page"""
+        """Main dashboard page (lightweight version)"""
+        return render_template('dashboard_simple.html')
+    
+    @app.route('/full')
+    def full_dashboard():
+        """Full featured dashboard"""
         return render_template('dashboard.html')
     
     @app.route('/api/price-data')
     def get_price_data():
-        """Get recent price data"""
+        """Get recent price data (limited and optimized)"""
         session = get_session()
         
         try:
-            # Get last 24 hours of price data
-            cutoff_time = datetime.utcnow() - timedelta(hours=24)
+            # Get last 6 hours of price data, limit to 50 points max
+            cutoff_time = datetime.utcnow() - timedelta(hours=6)
             
             price_data = session.query(PriceData).filter(
                 PriceData.timestamp >= cutoff_time
-            ).order_by(PriceData.timestamp).all()
+            ).order_by(PriceData.timestamp.desc()).limit(50).all()
+            
+            # Reverse to get chronological order
+            price_data = list(reversed(price_data))
             
             data = [{
                 'timestamp': entry.timestamp.isoformat(),
-                'price': entry.price,
-                'volume': entry.volume or 0
+                'price': float(entry.price) if entry.price else 0,
+                'volume': float(entry.volume) if entry.volume else 0
             } for entry in price_data]
             
             return jsonify({
                 'success': True,
                 'data': data,
-                'count': len(data)
+                'count': len(data),
+                'latest_price': data[-1]['price'] if data else 0
             })
             
         except Exception as e:

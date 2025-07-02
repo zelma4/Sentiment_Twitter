@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcoin Analysis Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .header h1 {
+            color: white;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .stat-title {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .chart-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+        
+        .error {
+            color: #e74c3c;
+            background: rgba(231, 76, 60, 0.1);
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .refresh-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        
+        .refresh-btn:hover {
+            background: #2980b9;
+        }
+        
+        .simple-chart {
+            width: 100%;
+            height: 200px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🔮 Bitcoin Analysis Dashboard</h1>
+        <p>Real-time sentiment analysis and price predictions</p>
+    </div>
+    
+    <div class="container">
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-title">Current Price</div>
+                <div class="stat-value" id="currentPrice">Loading...</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-title">24h Sentiment</div>
+                <div class="stat-value" id="sentiment">Loading...</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-title">Posts Analyzed</div>
+                <div class="stat-value" id="postsCount">Loading...</div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-title">Last Update</div>
+                <div class="stat-value" id="lastUpdate">Loading...</div>
+            </div>
+        </div>
+        
+        <!-- Simple Price Chart -->
+        <div class="chart-container">
+            <h3>Recent Price Trend</h3>
+            <div id="priceChart" class="simple-chart">
+                Loading price data...
+            </div>
+        </div>
+        
+        <!-- Controls -->
+        <div style="text-align: center;">
+            <button class="refresh-btn" onclick="loadData()">🔄 Refresh Data</button>
+        </div>
+    </div>
+
+    <script>
+        let isLoading = false;
+        
+        async function loadData() {
+            if (isLoading) return;
+            isLoading = true;
+            
+            try {
+                // Load basic stats
+                await loadStats();
+                
+                // Load price data (simplified)
+                await loadSimplePriceChart();
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showError('Failed to load data. Please try again.');
+            } finally {
+                isLoading = false;
+            }
+        }
+        
+        async function loadStats() {
+            try {
+                // Load price data
+                const priceResponse = await fetch('/api/price-data');
+                const priceResult = await priceResponse.json();
+                
+                if (priceResult.success && priceResult.latest_price) {
+                    document.getElementById('currentPrice').textContent = 
+                        '$' + priceResult.latest_price.toLocaleString();
+                }
+                
+                // Load sentiment summary
+                const sentimentResponse = await fetch('/api/sentiment-summary');
+                const sentimentResult = await sentimentResponse.json();
+                
+                if (sentimentResult.success) {
+                    const overall = sentimentResult.data.overall_sentiment;
+                    document.getElementById('sentiment').textContent = 
+                        overall.toFixed(3);
+                    document.getElementById('postsCount').textContent = 
+                        sentimentResult.data.total_posts || '0';
+                }
+                
+                // Update timestamp
+                document.getElementById('lastUpdate').textContent = 
+                    new Date().toLocaleTimeString();
+                
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+        
+        async function loadSimplePriceChart() {
+            try {
+                const response = await fetch('/api/price-data');
+                const result = await response.json();
+                
+                if (result.success && result.data.length > 0) {
+                    const data = result.data;
+                    const latest = data[data.length - 1];
+                    const previous = data[0];
+                    
+                    const change = latest.price - previous.price;
+                    const changePercent = ((change / previous.price) * 100).toFixed(2);
+                    
+                    const chartDiv = document.getElementById('priceChart');
+                    chartDiv.innerHTML = `
+                        <div style="text-align: center;">
+                            <div style="font-size: 2rem; font-weight: bold; margin-bottom: 1rem;">
+                                $${latest.price.toLocaleString()}
+                            </div>
+                            <div style="font-size: 1.2rem; color: ${change >= 0 ? '#27ae60' : '#e74c3c'}">
+                                ${change >= 0 ? '↗' : '↘'} ${changePercent}%
+                            </div>
+                            <div style="font-size: 0.9rem; color: #666; margin-top: 0.5rem;">
+                                Last ${data.length} data points
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('priceChart').innerHTML = 
+                        '<div style="color: #666;">No price data available</div>';
+                }
+                
+            } catch (error) {
+                console.error('Error loading price chart:', error);
+                document.getElementById('priceChart').innerHTML = 
+                    '<div style="color: #e74c3c;">Error loading chart</div>';
+            }
+        }
+        
+        function showError(message) {
+            const container = document.querySelector('.container');
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            container.insertBefore(errorDiv, container.firstChild);
+            
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+        
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', loadData);
+        
+        // Auto refresh every 30 seconds
+        setInterval(loadData, 30000);
+    </script>
+</body>
+</html>

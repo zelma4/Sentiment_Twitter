@@ -8,7 +8,7 @@ import logging
 import schedule
 import time
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from config.settings import settings
 from database.models import create_database
 from data_collectors.twitter_collector import TwitterCollector
@@ -71,13 +71,13 @@ class BitcoinAnalysisBot:
             self.logger.info("Collecting price data...")
             price_stats = self.price_collector.collect_and_save()
             
-            # Collect Twitter data
+            # Collect Twitter data (reduced to avoid rate limits)
             self.logger.info("Collecting Twitter data...")
-            twitter_stats = self.twitter_collector.collect_and_save(max_results=100)
+            twitter_stats = self.twitter_collector.collect_and_save(max_results=25)
             
-            # Collect Reddit data
+            # Collect Reddit data (reduced)
             self.logger.info("Collecting Reddit data...")
-            reddit_stats = self.reddit_collector.collect_and_save(posts_limit=50, comments_limit=30)
+            reddit_stats = self.reddit_collector.collect_and_save(posts_limit=20, comments_limit=10)
             
             # Log collection summary
             total_social_posts = 0
@@ -207,8 +207,11 @@ class BitcoinAnalysisBot:
         """Setup scheduled tasks"""
         self.logger.info("Setting up scheduler...")
         
-        # Data collection and analysis every 30 minutes
+        # Data collection and analysis every hour (reduced from 30 min)
         schedule.every(settings.UPDATE_INTERVAL_MINUTES).minutes.do(self.run_full_cycle)
+        
+        # Send hourly summary if there's interesting data
+        schedule.every().hour.at(":30").do(self.send_hourly_summary)
         
         # Model retraining every week
         schedule.every().sunday.at("02:00").do(self.retrain_model_weekly)
@@ -297,21 +300,38 @@ class BitcoinAnalysisBot:
             return False
 
     def send_startup_message(self):
-        """Send startup message to Telegram"""
+        """Send startup message to Telegram (only once per day)"""
         try:
             if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
                 return False
+            
+            # Check if startup message was already sent today
+            today = datetime.utcnow().date()
+            startup_file = "last_startup.txt"
+            
+            # Check if we already sent startup message today
+            try:
+                with open(startup_file, 'r') as f:
+                    last_startup = f.read().strip()
+                    if last_startup == str(today):
+                        self.logger.info("Startup message already sent today, skipping")
+                        return False
+            except FileNotFoundError:
+                pass
                 
             message = "🚀 **Bitcoin Analysis Bot Started**\n\n"
             message += "✅ Bot is now running 24/7\n"
             message += f"⏰ Analysis every {settings.UPDATE_INTERVAL_MINUTES} minutes\n"
-            message += f"🔍 Monitoring: Twitter, Reddit, Price data\n"
+            message += "🔍 Monitoring: Twitter, Reddit, Price data\n"
             message += f"📊 ML Predictions: {settings.PREDICTION_DAYS} days\n\n"
             message += "Ready to send alerts for significant changes! 📈📉"
             
             success = send_telegram_message(message)
             
             if success:
+                # Save today's date to prevent spam
+                with open(startup_file, 'w') as f:
+                    f.write(str(today))
                 self.logger.info("📱 Startup message sent to Telegram")
             else:
                 self.logger.warning("📱 Failed to send startup message")
@@ -320,6 +340,57 @@ class BitcoinAnalysisBot:
             
         except Exception as e:
             self.logger.error(f"Error sending startup message: {e}")
+            return False
+
+    def send_hourly_summary(self):
+        """Send hourly summary if there's interesting data"""
+        try:
+            if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
+                return False
+                
+            # Check if we have recent data
+            from database.models import get_session, PriceData, SentimentData
+            session = get_session()
+            
+            try:
+                # Get latest price
+                latest_price = session.query(PriceData).order_by(PriceData.timestamp.desc()).first()
+                
+                # Get recent sentiment data
+                cutoff_time = datetime.utcnow() - timedelta(hours=2)
+                recent_sentiment = session.query(SentimentData).filter(
+                    SentimentData.timestamp >= cutoff_time
+                ).all()
+                
+                if not latest_price or not recent_sentiment:
+                    self.logger.info("Not enough data for hourly summary")
+                    return False
+                
+                # Create summary message
+                message = "📊 **Hourly Bitcoin Summary**\n\n"
+                message += f"💰 **Current Price:** ${latest_price.price:,.2f}\n"
+                
+                # Calculate average sentiment
+                avg_sentiment = sum(s.compound_score for s in recent_sentiment) / len(recent_sentiment)
+                sentiment_emoji = "🚀" if avg_sentiment > 0.1 else "📉" if avg_sentiment < -0.1 else "😐"
+                message += f"💭 **Avg Sentiment:** {sentiment_emoji} {avg_sentiment:.3f}\n"
+                message += f"📈 **Posts Analyzed:** {len(recent_sentiment)}\n\n"
+                message += f"⏰ **Time:** {datetime.utcnow().strftime('%H:%M UTC')}"
+                
+                success = send_telegram_message(message)
+                
+                if success:
+                    self.logger.info("📱 Hourly summary sent to Telegram")
+                else:
+                    self.logger.warning("📱 Failed to send hourly summary")
+                    
+                return success
+                
+            finally:
+                session.close()
+                
+        except Exception as e:
+            self.logger.error(f"Error sending hourly summary: {e}")
             return False
 
     def run(self):

@@ -27,7 +27,7 @@ class Settings:
     DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///bitcoin_analysis.db')
     
     # Configuration
-    UPDATE_INTERVAL_MINUTES = int(os.getenv('UPDATE_INTERVAL_MINUTES', 30))
+    UPDATE_INTERVAL_MINUTES = int(os.getenv('UPDATE_INTERVAL_MINUTES', 60))
     PREDICTION_DAYS = int(os.getenv('PREDICTION_DAYS', 7))
     MIN_SENTIMENT_POSTS = int(os.getenv('MIN_SENTIMENT_POSTS', 50))
     
