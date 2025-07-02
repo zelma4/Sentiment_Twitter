@@ -17,6 +17,7 @@ from data_collectors.price_collector import PriceCollector
 from analysis.sentiment_analyzer import SentimentAnalyzer
 from analysis.technical_analyzer import TechnicalAnalyzer
 from analysis.predictor import BitcoinPredictor
+from utils.helpers import send_telegram_message, create_alert_message
 import threading
 
 class BitcoinAnalysisBot:
@@ -24,6 +25,7 @@ class BitcoinAnalysisBot:
         self.setup_logging()
         self.initialize_components()
         self.running = False
+        self.last_alert_time = None  # Track last alert time
         
     def setup_logging(self):
         """Setup logging configuration"""
@@ -126,6 +128,10 @@ class BitcoinAnalysisBot:
             
             # Log key insights
             self.log_key_insights(analysis_report)
+            
+            # Send Telegram alert if conditions are met
+            if self.should_send_alert(analysis_report):
+                self.send_telegram_alert(analysis_report)
             
             return analysis_report
             
@@ -231,6 +237,91 @@ class BitcoinAnalysisBot:
         except Exception as e:
             self.logger.error(f"Failed to start web server: {e}")
     
+    def send_telegram_alert(self, analysis_report):
+        """Send Telegram alert with analysis results"""
+        try:
+            if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
+                return False
+                
+            # Create alert message
+            alert_message = create_alert_message(analysis_report)
+            
+            # Send to Telegram
+            success = send_telegram_message(alert_message)
+            
+            if success:
+                self.logger.info("📱 Telegram alert sent successfully")
+                self.last_alert_time = datetime.utcnow()  # Update last alert time
+            else:
+                self.logger.warning("📱 Failed to send Telegram alert")
+                
+            return success
+            
+        except Exception as e:
+            self.logger.error(f"Error sending Telegram alert: {e}")
+            return False
+
+    def should_send_alert(self, analysis_report):
+        """Determine if alert should be sent based on analysis"""
+        try:
+            # Check if enough time has passed since last alert (1 hour minimum)
+            if self.last_alert_time:
+                time_since_last = datetime.utcnow() - self.last_alert_time
+                if time_since_last.total_seconds() < 3600:  # 1 hour
+                    return False
+            
+            # Always send alert for significant price changes
+            if analysis_report.get('predictions'):
+                predictions = analysis_report['predictions'].get('predictions', {})
+                if '24h' in predictions:
+                    change_pct = predictions['24h'].get('price_change_pct', 0)
+                    if abs(change_pct) > 5:  # >5% change
+                        return True
+            
+            # Send alert for extreme sentiment
+            if analysis_report.get('sentiment'):
+                sentiment_score = analysis_report['sentiment']['overall']['overall_score']
+                if sentiment_score < -0.5 or sentiment_score > 0.5:
+                    return True
+            
+            # Send alert for strong technical signals
+            if analysis_report.get('technical'):
+                recommendation = analysis_report['technical'].get('recommendation', '')
+                if recommendation in ['STRONG_BUY', 'STRONG_SELL']:
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"Error checking alert conditions: {e}")
+            return False
+
+    def send_startup_message(self):
+        """Send startup message to Telegram"""
+        try:
+            if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
+                return False
+                
+            message = "🚀 **Bitcoin Analysis Bot Started**\n\n"
+            message += "✅ Bot is now running 24/7\n"
+            message += f"⏰ Analysis every {settings.UPDATE_INTERVAL_MINUTES} minutes\n"
+            message += f"🔍 Monitoring: Twitter, Reddit, Price data\n"
+            message += f"📊 ML Predictions: {settings.PREDICTION_DAYS} days\n\n"
+            message += "Ready to send alerts for significant changes! 📈📉"
+            
+            success = send_telegram_message(message)
+            
+            if success:
+                self.logger.info("📱 Startup message sent to Telegram")
+            else:
+                self.logger.warning("📱 Failed to send startup message")
+                
+            return success
+            
+        except Exception as e:
+            self.logger.error(f"Error sending startup message: {e}")
+            return False
+
     def run(self):
         """Main run method"""
         self.logger.info("🚀 Bitcoin Analysis Bot Starting Up")
@@ -241,9 +332,15 @@ class BitcoinAnalysisBot:
         # Start web server
         self.start_web_server()
         
+        # Send startup message to Telegram
+        self.send_startup_message()
+        
         # Run initial cycle
         self.logger.info("Running initial analysis cycle...")
         self.run_full_cycle()
+        
+        # Send startup message
+        self.send_startup_message()
         
         # Start scheduled tasks
         self.running = True
