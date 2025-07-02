@@ -4,7 +4,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from database.models import get_session, PriceData, TechnicalAnalysis
 from config.settings import settings
-import talib
+import ta
 
 class TechnicalAnalyzer:
     def __init__(self):
@@ -62,17 +62,17 @@ class TechnicalAnalyzer:
             ma_data = {}
             
             # Simple Moving Averages
-            ma_data['sma_20'] = talib.SMA(df['close'], timeperiod=20)
-            ma_data['sma_50'] = talib.SMA(df['close'], timeperiod=50)
-            ma_data['sma_200'] = talib.SMA(df['close'], timeperiod=200)
+            ma_data['sma_20'] = ta.trend.sma_indicator(df['close'], window=20)
+            ma_data['sma_50'] = ta.trend.sma_indicator(df['close'], window=50)
+            ma_data['sma_200'] = ta.trend.sma_indicator(df['close'], window=200)
             
             # Exponential Moving Averages
-            ma_data['ema_12'] = talib.EMA(df['close'], timeperiod=12)
-            ma_data['ema_26'] = talib.EMA(df['close'], timeperiod=26)
+            ma_data['ema_12'] = ta.trend.ema_indicator(df['close'], window=12)
+            ma_data['ema_26'] = ta.trend.ema_indicator(df['close'], window=26)
             
             # Volume SMA
             if 'volume' in df.columns:
-                ma_data['volume_sma'] = talib.SMA(df['volume'], timeperiod=20)
+                ma_data['volume_sma'] = ta.trend.sma_indicator(df['volume'], window=20)
             
             return ma_data
             
@@ -89,24 +89,22 @@ class TechnicalAnalyzer:
             osc_data = {}
             
             # RSI
-            osc_data['rsi'] = talib.RSI(df['close'], timeperiod=14)
+            osc_data['rsi'] = ta.momentum.rsi(df['close'], window=14)
             
             # MACD
-            macd, macd_signal, macd_hist = talib.MACD(df['close'])
-            osc_data['macd'] = macd
-            osc_data['macd_signal'] = macd_signal
-            osc_data['macd_histogram'] = macd_hist
+            osc_data['macd'] = ta.trend.macd(df['close'])
+            osc_data['macd_signal'] = ta.trend.macd_signal(df['close'])
+            osc_data['macd_histogram'] = ta.trend.macd_diff(df['close'])
             
             # Stochastic
-            stoch_k, stoch_d = talib.STOCH(df['high'], df['low'], df['close'])
-            osc_data['stoch_k'] = stoch_k
-            osc_data['stoch_d'] = stoch_d
+            osc_data['stoch_k'] = ta.momentum.stoch(df['high'], df['low'], df['close'])
+            osc_data['stoch_d'] = ta.momentum.stoch_signal(df['high'], df['low'], df['close'])
             
             # Williams %R
-            osc_data['williams_r'] = talib.WILLR(df['high'], df['low'], df['close'])
+            osc_data['williams_r'] = ta.momentum.williams_r(df['high'], df['low'], df['close'])
             
             # CCI
-            osc_data['cci'] = talib.CCI(df['high'], df['low'], df['close'])
+            osc_data['cci'] = ta.trend.cci(df['high'], df['low'], df['close'])
             
             return osc_data
             
@@ -123,13 +121,12 @@ class TechnicalAnalyzer:
             vol_data = {}
             
             # Bollinger Bands
-            bb_upper, bb_middle, bb_lower = talib.BBANDS(df['close'])
-            vol_data['bb_upper'] = bb_upper
-            vol_data['bb_middle'] = bb_middle
-            vol_data['bb_lower'] = bb_lower
+            vol_data['bb_upper'] = ta.volatility.bollinger_hband(df['close'])
+            vol_data['bb_middle'] = ta.volatility.bollinger_mavg(df['close'])
+            vol_data['bb_lower'] = ta.volatility.bollinger_lband(df['close'])
             
             # ATR
-            vol_data['atr'] = talib.ATR(df['high'], df['low'], df['close'])
+            vol_data['atr'] = ta.volatility.average_true_range(df['high'], df['low'], df['close'])
             
             return vol_data
             
@@ -146,7 +143,7 @@ class TechnicalAnalyzer:
             vol_data = {}
             
             # OBV (On Balance Volume)
-            vol_data['obv'] = talib.OBV(df['close'], df['volume'])
+            vol_data['obv'] = ta.volume.on_balance_volume(df['close'], df['volume'])
             
             return vol_data
             
@@ -163,7 +160,7 @@ class TechnicalAnalyzer:
             trend_data = {}
             
             # ADX
-            trend_data['adx'] = talib.ADX(df['high'], df['low'], df['close'])
+            trend_data['adx'] = ta.trend.adx(df['high'], df['low'], df['close'])
             
             return trend_data
             

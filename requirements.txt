@@ -26,7 +26,7 @@ textblob==0.17.1
 
 # Technical analysis
 ta>=0.10.0
-TA-Lib>=0.4.0
+# TA-Lib>=0.4.0  # Removed due to system dependencies on Render
 
 # Database
 sqlalchemy>=2.0.0
