@@ -33,6 +33,7 @@ sqlalchemy>=2.0.0
 
 # Web framework
 flask>=2.3.0
+gunicorn>=21.2.0
 
 # Machine Learning (lightweight versions)
 xgboost>=1.7.0
