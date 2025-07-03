@@ -71,13 +71,17 @@ class BitcoinAnalysisBot:
             self.logger.info("Collecting price data...")
             price_stats = self.price_collector.collect_and_save()
             
-            # Collect Twitter data (reduced to avoid rate limits)
-            self.logger.info("Collecting Twitter data...")
-            twitter_stats = self.twitter_collector.collect_and_save(max_results=25)
-            
-            # Collect Reddit data (reduced)
+            # Collect Reddit data first (always works)
             self.logger.info("Collecting Reddit data...")
             reddit_stats = self.reddit_collector.collect_and_save(posts_limit=20, comments_limit=10)
+            
+            # Collect Twitter data (may hit rate limits)
+            self.logger.info("Collecting Twitter data...")
+            try:
+                twitter_stats = self.twitter_collector.collect_and_save(max_results=25)
+            except Exception as e:
+                self.logger.warning(f"Twitter collection failed: {e}")
+                twitter_stats = None
             
             # Log collection summary
             total_social_posts = 0
