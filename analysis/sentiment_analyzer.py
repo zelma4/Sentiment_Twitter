@@ -20,9 +20,14 @@ class SentimentAnalyzer:
         if ADVANCED_SENTIMENT_AVAILABLE:
             try:
                 self.cryptobert_analyzer = CryptoBERTAnalyzer()
-                self.hybrid_analyzer = HybridSentimentAnalyzer()
-                self.use_advanced = True
-                self.logger.info("✅ Advanced CryptoBERT sentiment analysis enabled")
+                # Check if CryptoBERT actually loaded successfully
+                if hasattr(self.cryptobert_analyzer, 'classifier') and self.cryptobert_analyzer.classifier is not None:
+                    self.hybrid_analyzer = HybridSentimentAnalyzer()
+                    self.use_advanced = True
+                    self.logger.info("✅ Advanced CryptoBERT sentiment analysis enabled")
+                else:
+                    self.logger.warning("⚠️ CryptoBERT failed to load, using traditional methods")
+                    self.use_advanced = False
             except Exception as e:
                 self.logger.warning(f"⚠️ Failed to initialize CryptoBERT: {e}")
                 self.use_advanced = False
@@ -54,7 +59,10 @@ class SentimentAnalyzer:
             }
         
         # Use CryptoBERT if available (best for crypto content)
-        if self.use_advanced and source in ['twitter', 'reddit', 'social']:
+        if (self.use_advanced and source in ['twitter', 'reddit', 'social'] and 
+            hasattr(self, 'cryptobert_analyzer') and 
+            hasattr(self.cryptobert_analyzer, 'classifier') and 
+            self.cryptobert_analyzer.classifier is not None):
             try:
                 result = self.cryptobert_analyzer.analyze_sentiment(text)
                 return {
@@ -68,7 +76,7 @@ class SentimentAnalyzer:
                 self.logger.warning(f"CryptoBERT failed, falling back: {e}")
         
         # Use hybrid analyzer for news and mixed content
-        if self.use_advanced:
+        if self.use_advanced and hasattr(self, 'hybrid_analyzer'):
             try:
                 result = self.hybrid_analyzer.analyze_comprehensive(text)
                 return {

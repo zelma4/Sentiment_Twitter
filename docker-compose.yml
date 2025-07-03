@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  bitcoin-sentiment-bot:
+    build: .
+    container_name: bitcoin_sentiment_bot
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./.env:/app/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - bot-network
+    # Uncomment if you want to expose web interface
+    # ports:
+    #   - "8000:8000"
+
+networks:
+  bot-network:
+    driver: bridge
+
+volumes:
+  bot-data:
+  bot-logs:

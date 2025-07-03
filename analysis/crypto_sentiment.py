@@ -35,44 +35,139 @@ class CryptoBERTAnalyzer:
         self._load_model()
     
     def _load_model(self):
-        """Load the CryptoBERT model and tokenizer"""
+        """Load CryptoBERT model with proper meta tensor handling"""
+        if not TRANSFORMERS_AVAILABLE:
+            logger.error("❌ Transformers library not available")
+            raise ImportError("Transformers library required for CryptoBERT")
+            
         try:
             logger.info("Loading CryptoBERT model...")
             
-            # Load with explicit tokenizer and model for better control
-            tokenizer = AutoTokenizer.from_pretrained(self.model_name, use_fast=True)
-            model = AutoModelForSequenceClassification.from_pretrained(
-                self.model_name, 
-                num_labels=3
-            )
+            import torch
             
-            self.classifier = pipeline(
-                "text-classification",
-                model=model,
-                tokenizer=tokenizer,
-                max_length=128,  # CryptoBERT optimal length
-                truncation=True,
-                padding='max_length',
-                return_all_scores=True
-            )
+            # Clear any existing cache/memory
+            if hasattr(torch.cuda, 'empty_cache'):
+                torch.cuda.empty_cache()
             
-            logger.info("✅ CryptoBERT model loaded successfully")
+            # Use a simpler approach that avoids meta tensor issues
+            try:
+                logger.info("Loading CryptoBERT with optimized approach...")
+                
+                # Load tokenizer first
+                tokenizer = AutoTokenizer.from_pretrained(
+                    self.model_name,
+                    use_fast=True,
+                    trust_remote_code=True
+                )
+                
+                # Load model with low_cpu_mem_usage to avoid meta tensor issues
+                model = AutoModelForSequenceClassification.from_pretrained(
+                    self.model_name,
+                    trust_remote_code=True,
+                    torch_dtype=torch.float32,
+                    low_cpu_mem_usage=True
+                )
+                
+                # Try to move to best available device
+                device = "cpu"
+                try:
+                    if torch.backends.mps.is_available():
+                        device = "mps"
+                        model = model.to(device)
+                        logger.info("Model moved to MPS device")
+                    elif torch.cuda.is_available():
+                        device = "cuda"
+                        model = model.to(device)
+                        logger.info("Model moved to CUDA device")
+                    else:
+                        logger.info("Model staying on CPU")
+                except Exception as device_error:
+                    logger.warning(f"Device move failed: {device_error}")
+                    device = "cpu"
+                
+                self.classifier = pipeline(
+                    "text-classification",
+                    model=model,
+                    tokenizer=tokenizer,
+                    device=0 if device in ["cuda", "mps"] else -1,
+                    top_k=None  # Return all scores
+                )
+                
+                logger.info("✅ CryptoBERT model loaded successfully")
+                
+            except Exception as main_error:
+                logger.warning(f"Main loading approach failed: {main_error}")
+                # Fallback to simple pipeline loading
+                try:
+                    tokenizer = AutoTokenizer.from_pretrained(
+                        self.model_name,
+                        use_fast=True,
+                        trust_remote_code=True
+                    )
+                    
+                    model = AutoModelForSequenceClassification.from_pretrained(
+                        self.model_name,
+                        trust_remote_code=True,
+                        torch_dtype=torch.float32,
+                        low_cpu_mem_usage=True
+                    )
+                    
+                    # Try to move to best available device
+                    device = "cpu"
+                    if torch.backends.mps.is_available():
+                        try:
+                            device = "mps"
+                            model = model.to(device)
+                        except Exception:
+                            device = "cpu"
+                    elif torch.cuda.is_available():
+                        try:
+                            device = "cuda"
+                            model = model.to(device)
+                        except Exception:
+                            device = "cpu"
+                    
+                    self.classifier = pipeline(
+                        "text-classification",
+                        model=model,
+                        tokenizer=tokenizer,
+                        device=0 if device in ["cuda", "mps"] else -1,
+                        top_k=None
+                    )
+                    
+                    logger.info(f"✅ CryptoBERT loaded on {device} (fallback)")
+                    
+                except Exception as fallback_error:
+                    logger.warning(f"Direct loading failed: {fallback_error}")
+                    # Final fallback to simple pipeline
+                    self.classifier = pipeline(
+                        "text-classification",
+                        model=self.model_name,
+                        device=-1,  # Force CPU
+                        top_k=None
+                    )
+                    logger.info("✅ CryptoBERT loaded with simple pipeline")
             
         except Exception as e:
             logger.error(f"❌ Failed to load CryptoBERT model: {e}")
-            # Fallback to basic pipeline
+            # Complete fallback
             try:
+                logger.info("Attempting simple pipeline fallback...")
                 self.classifier = pipeline(
                     "text-classification",
                     model=self.model_name,
-                    return_all_scores=True
+                    device=-1,
+                    top_k=None
                 )
-                logger.info("✅ CryptoBERT loaded with basic pipeline")
+                logger.info("✅ CryptoBERT loaded with fallback")
             except Exception as e2:
                 logger.error(f"❌ Complete failure to load CryptoBERT: {e2}")
-                raise e2
+                self.classifier = None
+                # Don't raise - allow graceful degradation
     
-    def analyze_sentiment(self, text: str) -> Dict[str, Union[float, str, int]]:
+    def analyze_sentiment(
+        self, text: str
+    ) -> Dict[str, Union[float, str, int]]:
         """
         Analyze sentiment of a single text using CryptoBERT
         
@@ -86,6 +181,18 @@ class CryptoBERTAnalyzer:
             return {
                 'score': 0.0,
                 'confidence': 0.0,
+                'label': 'Neutral',
+                'raw_scores': {
+                    'Bearish': 0.33, 'Neutral': 0.34, 'Bullish': 0.33
+                }
+            }
+        
+        # Check if model loaded successfully
+        if self.classifier is None:
+            logger.warning("CryptoBERT not available, returning neutral sentiment")
+            return {
+                'score': 0.0,
+                'confidence': 0.5,
                 'label': 'Neutral',
                 'raw_scores': {'Bearish': 0.33, 'Neutral': 0.34, 'Bullish': 0.33}
             }

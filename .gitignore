@@ -68,3 +68,12 @@ htmlcov/
 # Temporary files
 *.tmp
 *.temp
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# Deployment
+/data/
+/backups/
+deployment.log
