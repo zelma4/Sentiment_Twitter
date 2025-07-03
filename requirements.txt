@@ -38,6 +38,15 @@ gunicorn>=21.2.0
 # Machine Learning (lightweight versions)
 xgboost>=1.7.0
 joblib>=1.3.0
+lightgbm>=4.0.0
+
+# Advanced NLP for crypto sentiment
+transformers>=4.21.0
+torch>=1.12.0
+tokenizers>=0.13.0
+
+# Additional crypto data sources
+fear-greed-index>=1.0.0
 
 # Utilities
 python-telegram-bot>=20.0

@@ -196,6 +196,136 @@ def create_alert_message(analysis_report, alert_type="UPDATE"):
         logging.error(f"Error creating alert message: {e}")
         return f"Error creating {alert_type} alert message"
 
+def create_enhanced_alert_message(analysis_report, alert_type="UPDATE"):
+    """Create enhanced alert message with neural network insights"""
+    try:
+        # Alert type specific headers
+        if alert_type == "CRITICAL":
+            header = "🚨 **CRITICAL BITCOIN ALERT** 🚨\n\n"
+        elif alert_type == "STARTUP":
+            header = "🤖 **Enhanced Bitcoin Bot Started** 🚀\n\n"
+        elif alert_type == "SUMMARY":
+            header = "📊 **Bitcoin Analysis Summary** 📊\n\n"
+        else:
+            header = "🔮 **Enhanced Bitcoin Analysis** 🧠\n\n"
+        
+        message = header
+        
+        # Price info with change indicator
+        if analysis_report.get('price_data'):
+            price_data = analysis_report['price_data']
+            price = price_data.get('current_price')
+            change_24h = price_data.get('price_change_24h', 0)
+            
+            if price:
+                change_symbol = "🔴" if change_24h < 0 else "🟢" if change_24h > 0 else "⚪"
+                message += f"💰 **Price:** {format_price(price)} {change_symbol}\n"
+                if abs(change_24h) > 0.01:
+                    message += f"📈 **24h Change:** {format_percentage(change_24h)}\n"
+        
+        # Enhanced sentiment with CryptoBERT
+        if analysis_report.get('sentiment'):
+            sentiment = analysis_report['sentiment']['overall']
+            sentiment_score = sentiment['overall_score']
+            
+            # Check if advanced analysis was used
+            method = sentiment.get('method', 'standard')
+            is_advanced = method in ['cryptobert', 'hybrid']
+            
+            # Sentiment emoji
+            if sentiment_score > 0.5:
+                sentiment_emoji = "😁"
+            elif sentiment_score > 0.2:
+                sentiment_emoji = "😊"
+            elif sentiment_score > -0.2:
+                sentiment_emoji = "😐"
+            elif sentiment_score > -0.5:
+                sentiment_emoji = "😟"
+            else:
+                sentiment_emoji = "😨"
+            
+            # Add neural network indicator
+            if is_advanced:
+                message += f"🧠 **CryptoBERT:** {format_sentiment_score(sentiment_score)} {sentiment_emoji}\n"
+                confidence = sentiment.get('confidence', 0)
+                message += f"🎯 **AI Confidence:** {confidence:.1%}\n"
+            else:
+                message += f"💭 **Sentiment:** {format_sentiment_score(sentiment_score)} {sentiment_emoji}\n"
+            
+            message += f"📊 **Posts:** {sentiment['total_posts']}\n"
+        
+        # LightGBM prediction
+        if analysis_report.get('lightgbm_prediction'):
+            lgb_pred = analysis_report['lightgbm_prediction']
+            direction = lgb_pred.get('direction', 0)
+            direction_text = lgb_pred.get('direction_text', 'Unknown')
+            confidence = lgb_pred.get('confidence', 0)
+            
+            direction_emoji = "🚀" if direction == 1 else "📉" if direction == -1 else "➡️"
+            message += f"🤖 **LightGBM:** {direction_emoji} {direction_text}\n"
+            message += f"🎯 **ML Confidence:** {confidence:.1%}\n"
+        
+        # Enhanced market metrics
+        if analysis_report.get('enhanced_metrics'):
+            metrics = analysis_report['enhanced_metrics']
+            
+            # Fear & Greed Index
+            if 'fear_greed_value' in metrics:
+                fg_value = metrics['fear_greed_value']
+                fg_class = metrics.get('fear_greed_class', 'Unknown')
+                message += f"😨 **Fear & Greed:** {fg_value} ({fg_class})\n"
+            
+            # StockTwits sentiment
+            if 'stocktwits_sentiment' in metrics:
+                st_sentiment = metrics['stocktwits_sentiment']
+                st_emoji = "🟢" if st_sentiment > 0.1 else "🔴" if st_sentiment < -0.1 else "🟡"
+                message += f"{st_emoji} **StockTwits:** {st_sentiment:.3f}\n"
+            
+            # Market correlations (show only top 2)
+            correlations = []
+            for key in ['btc_spy_corr', 'btc_qqq_corr', 'btc_gld_corr']:
+                if key in metrics:
+                    symbol = key.split('_')[1].upper()
+                    corr = metrics[key]
+                    correlations.append(f"{symbol}: {corr:.2f}")
+            
+            if correlations:
+                message += f"📈 **Correlations:** {', '.join(correlations[:2])}\n"
+        
+        # Technical analysis with strength
+        if analysis_report.get('technical'):
+            technical = analysis_report['technical']
+            recommendation = technical['recommendation']
+            strength = technical.get('signals', {}).get('strength', 0)
+            
+            # Technical emoji
+            tech_emoji = {
+                'STRONG_BUY': '🚀',
+                'BUY': '📈',
+                'HOLD': '⏸️',
+                'SELL': '📉',
+                'STRONG_SELL': '🔻'
+            }.get(recommendation, '❓')
+            
+            message += f"📊 **Technical:** {recommendation} {tech_emoji}\n"
+            if strength > 0:
+                message += f"💪 **Strength:** {strength:.2f}/1.0\n"
+        
+        # Add special notes for critical alerts
+        if alert_type == "CRITICAL":
+            message += "\n⚠️ **Critical market movement detected!**\n"
+        elif alert_type == "STARTUP":
+            message += "\n🚀 **Enhanced features active: CryptoBERT + LightGBM**\n"
+        
+        # Add timestamp
+        message += f"\n⏰ {datetime.utcnow().strftime('%H:%M:%S UTC, %Y-%m-%d')}"
+        
+        return message
+        
+    except Exception as e:
+        logging.error(f"Error creating enhanced alert message: {e}")
+        return f"Enhanced {alert_type} alert - Error in message formatting"
+
 def save_analysis_report(report, filename=None):
     """Save analysis report to JSON file"""
     try:

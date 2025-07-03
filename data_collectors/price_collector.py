@@ -313,6 +313,65 @@ class PriceCollector:
         else:
             self.logger.warning("No price data collected")
             return None
+    
+    def get_recent_prices(self, days=30):
+        """Get recent price data as DataFrame"""
+        session = get_session()
+        
+        try:
+            cutoff_time = datetime.utcnow() - timedelta(days=days)
+            
+            price_data = session.query(PriceData).filter(
+                PriceData.timestamp >= cutoff_time
+            ).order_by(PriceData.timestamp.asc()).all()
+            
+            if not price_data:
+                self.logger.warning(f"No price data found for last {days} days")
+                return pd.DataFrame()
+            
+            # Convert to DataFrame
+            data = []
+            for entry in price_data:
+                data.append({
+                    'date': entry.timestamp.date(),
+                    'open': entry.open_price or entry.price,
+                    'high': entry.high or entry.price,
+                    'low': entry.low or entry.price,
+                    'close': entry.close_price or entry.price,
+                    'volume': entry.volume
+                })
+            
+            df = pd.DataFrame(data)
+            df.set_index('date', inplace=True)
+            df = df.sort_index()
+            
+            self.logger.info(f"Retrieved {len(df)} days of price data")
+            return df
+            
+        except Exception as e:
+            self.logger.error(f"Error getting recent prices: {e}")
+            return pd.DataFrame()
+        finally:
+            session.close()
+    
+    def get_current_price(self):
+        """Get current Bitcoin price (tries Binance first, then CoinGecko)"""
+        try:
+            # Try Binance first
+            binance_data = self.get_current_price_binance()
+            if binance_data:
+                return binance_data['price']
+            
+            # Fallback to CoinGecko
+            coingecko_data = self.get_current_price_coingecko()
+            if coingecko_data:
+                return coingecko_data['price']
+                
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Failed to get current price: {e}")
+            return None
 
 if __name__ == "__main__":
     collector = PriceCollector()

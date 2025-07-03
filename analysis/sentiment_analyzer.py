@@ -5,13 +5,108 @@ from database.models import get_session, SentimentData
 from config.settings import settings
 import statistics
 
+# Try to import advanced sentiment analyzers
+try:
+    from analysis.crypto_sentiment import CryptoBERTAnalyzer, HybridSentimentAnalyzer
+    ADVANCED_SENTIMENT_AVAILABLE = True
+except ImportError:
+    ADVANCED_SENTIMENT_AVAILABLE = False
+
 class SentimentAnalyzer:
     def __init__(self):
         self.setup_logging()
         
+        # Initialize advanced sentiment analyzers if available
+        if ADVANCED_SENTIMENT_AVAILABLE:
+            try:
+                self.cryptobert_analyzer = CryptoBERTAnalyzer()
+                self.hybrid_analyzer = HybridSentimentAnalyzer()
+                self.use_advanced = True
+                self.logger.info("✅ Advanced CryptoBERT sentiment analysis enabled")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Failed to initialize CryptoBERT: {e}")
+                self.use_advanced = False
+        else:
+            self.use_advanced = False
+            self.logger.info("📊 Using traditional sentiment analysis only")
+        
     def setup_logging(self):
         logging.basicConfig(level=logging.INFO)
         self.logger = logging.getLogger(__name__)
+    
+    def analyze_text_sentiment(self, text, source="unknown"):
+        """
+        Analyze sentiment of a single text using best available method
+        
+        Args:
+            text: Text to analyze
+            source: Source of the text (twitter, reddit, news)
+            
+        Returns:
+            Dict with sentiment score and metadata
+        """
+        if not text or not text.strip():
+            return {
+                'score': 0.0,
+                'confidence': 0.0,
+                'method': 'empty_text',
+                'source': source
+            }
+        
+        # Use CryptoBERT if available (best for crypto content)
+        if self.use_advanced and source in ['twitter', 'reddit', 'social']:
+            try:
+                result = self.cryptobert_analyzer.analyze_sentiment(text)
+                return {
+                    'score': result['score'],
+                    'confidence': result['confidence'],
+                    'method': 'cryptobert',
+                    'label': result['label'],
+                    'source': source
+                }
+            except Exception as e:
+                self.logger.warning(f"CryptoBERT failed, falling back: {e}")
+        
+        # Use hybrid analyzer for news and mixed content
+        if self.use_advanced:
+            try:
+                result = self.hybrid_analyzer.analyze_comprehensive(text)
+                return {
+                    'score': result['hybrid_score'],
+                    'confidence': result['primary_confidence'],
+                    'method': 'hybrid',
+                    'primary_label': result['primary_label'],
+                    'source': source
+                }
+            except Exception as e:
+                self.logger.warning(f"Hybrid analyzer failed, falling back: {e}")
+        
+        # Fallback to traditional methods
+        return self._traditional_sentiment_analysis(text, source)
+    
+    def _traditional_sentiment_analysis(self, text, source):
+        """Traditional sentiment analysis using VADER/TextBlob"""
+        try:
+            from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+            
+            analyzer = SentimentIntensityAnalyzer()
+            scores = analyzer.polarity_scores(text)
+            
+            return {
+                'score': scores['compound'],
+                'confidence': abs(scores['compound']),
+                'method': 'vader',
+                'source': source,
+                'raw_scores': scores
+            }
+        except Exception as e:
+            self.logger.error(f"Traditional sentiment analysis failed: {e}")
+            return {
+                'score': 0.0,
+                'confidence': 0.0,
+                'method': 'fallback',
+                'source': source
+            }
     
     def get_recent_sentiment_data(self, hours=24):
         """Get sentiment data from the last N hours"""

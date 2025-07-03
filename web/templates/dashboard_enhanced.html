@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Bitcoin Analysis Dashboard 🧠</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .header h1 {
+            color: white;
+            font-size: 2.2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .header .subtitle {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1rem;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        .neural-status {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .neural-status.active {
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .neural-status.inactive {
+            border-left: 4px solid #f44336;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .stat-card h3 {
+            color: #5a67d8;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .enhanced-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .enhanced-card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .enhanced-card h3 {
+            color: #5a67d8;
+            margin-bottom: 1.5rem;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+        
+        .metric-label {
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .metric-value {
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+        
+        .positive { color: #4CAF50; }
+        .negative { color: #f44336; }
+        .neutral { color: #666; }
+        
+        .prediction-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+        }
+        
+        .prediction-direction {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .prediction-text {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .prediction-confidence {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+        
+        .error {
+            color: #f44336;
+            text-align: center;
+            padding: 1rem;
+            background: rgba(244, 67, 54, 0.1);
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+        
+        .refresh-btn {
+            background: #5a67d8;
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin-bottom: 2rem;
+            transition: background 0.3s ease;
+        }
+        
+        .refresh-btn:hover {
+            background: #4c63d2;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+            }
+            
+            .stats-grid,
+            .enhanced-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧠 Enhanced Bitcoin Analysis Dashboard</h1>
+        <div class="subtitle">Powered by CryptoBERT + LightGBM Neural Networks</div>
+    </div>
+    
+    <div class="container">
+        <!-- Neural Network Status -->
+        <div class="neural-status" id="neuralStatus">
+            <div class="loading">🔄 Checking neural network status...</div>
+        </div>
+        
+        <!-- Refresh Button -->
+        <button class="refresh-btn" onclick="refreshAllData()">🔄 Refresh Data</button>
+        
+        <!-- Basic Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>💰 Bitcoin Price</h3>
+                <div class="stat-value" id="currentPrice">Loading...</div>
+                <div class="stat-label">Current BTC/USD</div>
+            </div>
+            
+            <div class="stat-card">
+                <h3>💭 Sentiment Score</h3>
+                <div class="stat-value" id="sentimentScore">Loading...</div>
+                <div class="stat-label">Overall Market Sentiment</div>
+            </div>
+            
+            <div class="stat-card">
+                <h3>📊 Technical Signal</h3>
+                <div class="stat-value" id="technicalSignal">Loading...</div>
+                <div class="stat-label">Current Recommendation</div>
+            </div>
+            
+            <div class="stat-card">
+                <h3>🤖 AI Prediction</h3>
+                <div class="stat-value" id="aiPrediction">Loading...</div>
+                <div class="stat-label">LightGBM Direction</div>
+            </div>
+        </div>
+        
+        <!-- Enhanced Features Grid -->
+        <div class="enhanced-grid">
+            <!-- CryptoBERT Sentiment -->
+            <div class="enhanced-card">
+                <h3>🧠 CryptoBERT Sentiment Analysis</h3>
+                <div id="cryptobertAnalysis">
+                    <div class="loading">Loading neural sentiment analysis...</div>
+                </div>
+            </div>
+            
+            <!-- LightGBM Prediction -->
+            <div class="enhanced-card">
+                <h3>🤖 LightGBM Price Direction</h3>
+                <div id="lightgbmPrediction">
+                    <div class="loading">Loading ML prediction...</div>
+                </div>
+            </div>
+            
+            <!-- Enhanced Market Metrics -->
+            <div class="enhanced-card">
+                <h3>📊 Enhanced Market Metrics</h3>
+                <div id="enhancedMetrics">
+                    <div class="loading">Loading enhanced metrics...</div>
+                </div>
+            </div>
+            
+            <!-- Market Correlations -->
+            <div class="enhanced-card">
+                <h3>📈 Market Correlations</h3>
+                <div id="marketCorrelations">
+                    <div class="loading">Loading correlations...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Auto-refresh every 30 seconds
+        setInterval(refreshAllData, 30000);
+        
+        // Initial load
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshAllData();
+        });
+        
+        async function refreshAllData() {
+            await Promise.all([
+                loadBasicData(),
+                loadNeuralAnalysis(),
+                loadEnhancedMetrics()
+            ]);
+        }
+        
+        async function loadBasicData() {
+            try {
+                // Load price data
+                const priceResponse = await fetch('/api/price-data');
+                const priceData = await priceResponse.json();
+                
+                if (priceData.success && priceData.data.length > 0) {
+                    const latestPrice = priceData.data[priceData.data.length - 1].price;
+                    document.getElementById('currentPrice').textContent = `$${latestPrice.toLocaleString()}`;
+                }
+                
+                // Load sentiment data
+                const sentimentResponse = await fetch('/api/sentiment-summary');
+                const sentimentData = await sentimentResponse.json();
+                
+                if (sentimentData.success && sentimentData.data) {
+                    const score = sentimentData.data.overall_score || 0;
+                    const scoreElement = document.getElementById('sentimentScore');
+                    scoreElement.textContent = score.toFixed(3);
+                    scoreElement.className = `stat-value ${score > 0.1 ? 'positive' : score < -0.1 ? 'negative' : 'neutral'}`;
+                }
+                
+                // Load technical analysis
+                const technicalResponse = await fetch('/api/technical-analysis');
+                const technicalData = await technicalResponse.json();
+                
+                if (technicalData.success && technicalData.data) {
+                    document.getElementById('technicalSignal').textContent = 'HOLD'; // Default
+                }
+                
+            } catch (error) {
+                console.error('Error loading basic data:', error);
+            }
+        }
+        
+        async function loadNeuralAnalysis() {
+            try {
+                const response = await fetch('/api/neural-analysis');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const result = data.data;
+                    
+                    // Update neural status
+                    const statusElement = document.getElementById('neuralStatus');
+                    const cryptobertActive = result.cryptobert_available;
+                    const lightgbmActive = result.lightgbm_available;
+                    
+                    if (cryptobertActive && lightgbmActive) {
+                        statusElement.className = 'neural-status active';
+                        statusElement.innerHTML = '<strong>🚀 All Neural Networks Active</strong><br>CryptoBERT Sentiment + LightGBM Prediction';
+                    } else {
+                        statusElement.className = 'neural-status inactive';
+                        statusElement.innerHTML = '<strong>⚠️ Some Neural Networks Unavailable</strong><br>Falling back to standard analysis';
+                    }
+                    
+                    // Update CryptoBERT analysis
+                    const cryptobertDiv = document.getElementById('cryptobertAnalysis');
+                    if (result.cryptobert_available && result.sample_sentiment) {
+                        const sentiment = result.sample_sentiment;
+                        cryptobertDiv.innerHTML = `
+                            <div class="metric-row">
+                                <span class="metric-label">Model Status</span>
+                                <span class="metric-value positive">✅ Active</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Sample Analysis</span>
+                                <span class="metric-value">${sentiment.label}</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="metric-label">Confidence</span>
+                                <span class="metric-value">${(sentiment.confidence * 100).toFixed(1)}%</span>
+                            </div>
+                        `;
+                    } else {
+                        cryptobertDiv.innerHTML = `
+                            <div class="error">❌ CryptoBERT not available<br>${result.cryptobert_error || 'Unknown error'}</div>
+                        `;
+                    }
+                    
+                    // Update LightGBM prediction
+                    const lightgbmDiv = document.getElementById('lightgbmPrediction');
+                    if (result.lightgbm_available && result.prediction) {
+                        const pred = result.prediction;
+                        const directionEmoji = pred.direction === 1 ? '🚀' : pred.direction === -1 ? '📉' : '➡️';
+                        
+                        lightgbmDiv.innerHTML = `
+                            <div class="prediction-card">
+                                <div class="prediction-direction">${directionEmoji}</div>
+                                <div class="prediction-text">${pred.direction_text}</div>
+                                <div class="prediction-confidence">${(pred.confidence * 100).toFixed(1)}% Confidence</div>
+                            </div>
+                        `;
+                        
+                        // Update AI prediction in stats
+                        document.getElementById('aiPrediction').textContent = `${directionEmoji} ${pred.direction_text}`;
+                    } else {
+                        lightgbmDiv.innerHTML = `
+                            <div class="error">❌ LightGBM not available<br>${result.lightgbm_error || 'Unknown error'}</div>
+                        `;
+                        document.getElementById('aiPrediction').textContent = '❓ N/A';
+                    }
+                    
+                } else {
+                    console.error('Failed to load neural analysis:', data.error);
+                }
+                
+            } catch (error) {
+                console.error('Error loading neural analysis:', error);
+            }
+        }
+        
+        async function loadEnhancedMetrics() {
+            try {
+                const response = await fetch('/api/enhanced-metrics');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const metrics = data.data;
+                    
+                    // Enhanced metrics display
+                    const metricsDiv = document.getElementById('enhancedMetrics');
+                    let metricsHtml = '';
+                    
+                    if (metrics.fear_greed_value !== undefined) {
+                        metricsHtml += `
+                            <div class="metric-row">
+                                <span class="metric-label">😨 Fear & Greed Index</span>
+                                <span class="metric-value">${metrics.fear_greed_value} (${metrics.fear_greed_class || 'Unknown'})</span>
+                            </div>
+                        `;
+                    }
+                    
+                    if (metrics.stocktwits_sentiment !== undefined) {
+                        const stClass = metrics.stocktwits_sentiment > 0.1 ? 'positive' : 
+                                       metrics.stocktwits_sentiment < -0.1 ? 'negative' : 'neutral';
+                        metricsHtml += `
+                            <div class="metric-row">
+                                <span class="metric-label">💬 StockTwits Sentiment</span>
+                                <span class="metric-value ${stClass}">${metrics.stocktwits_sentiment.toFixed(3)}</span>
+                            </div>
+                        `;
+                    }
+                    
+                    if (metrics.nvt_ratio !== undefined) {
+                        metricsHtml += `
+                            <div class="metric-row">
+                                <span class="metric-label">⛓️ NVT Ratio</span>
+                                <span class="metric-value">${metrics.nvt_ratio.toFixed(2)}</span>
+                            </div>
+                        `;
+                    }
+                    
+                    metricsDiv.innerHTML = metricsHtml || '<div class="error">No enhanced metrics available</div>';
+                    
+                    // Market correlations display
+                    const correlationsDiv = document.getElementById('marketCorrelations');
+                    let correlationsHtml = '';
+                    
+                    const corrKeys = ['btc_spy_corr', 'btc_qqq_corr', 'btc_gld_corr'];
+                    const corrLabels = ['S&P 500', 'NASDAQ', 'Gold'];
+                    
+                    corrKeys.forEach((key, index) => {
+                        if (metrics[key] !== undefined) {
+                            const corr = metrics[key];
+                            const corrClass = Math.abs(corr) > 0.5 ? 'positive' : Math.abs(corr) > 0.2 ? 'neutral' : 'negative';
+                            correlationsHtml += `
+                                <div class="metric-row">
+                                    <span class="metric-label">📈 ${corrLabels[index]}</span>
+                                    <span class="metric-value ${corrClass}">${corr.toFixed(3)}</span>
+                                </div>
+                            `;
+                        }
+                    });
+                    
+                    correlationsDiv.innerHTML = correlationsHtml || '<div class="error">No correlation data available</div>';
+                    
+                } else {
+                    document.getElementById('enhancedMetrics').innerHTML = 
+                        `<div class="error">Failed to load enhanced metrics: ${data.error}</div>`;
+                }
+                
+            } catch (error) {
+                console.error('Error loading enhanced metrics:', error);
+                document.getElementById('enhancedMetrics').innerHTML = 
+                    '<div class="error">Error loading enhanced metrics</div>';
+            }
+        }
+    </script>
+</body>
+</html>

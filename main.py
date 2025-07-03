@@ -2,6 +2,7 @@
 """
 Bitcoin Analysis Bot
 Multi-functional bot for Bitcoin sentiment analysis, technical analysis, and price prediction.
+Enhanced with CryptoBERT, LightGBM, and additional data sources.
 """
 
 import logging
@@ -17,8 +18,19 @@ from data_collectors.price_collector import PriceCollector
 from analysis.sentiment_analyzer import SentimentAnalyzer
 from analysis.technical_analyzer import TechnicalAnalyzer
 from analysis.predictor import BitcoinPredictor
-from utils.helpers import send_telegram_message, create_alert_message
+from utils.helpers import (
+    send_telegram_message, 
+    create_enhanced_alert_message
+)
 import threading
+
+# Enhanced components
+try:
+    from data_collectors.enhanced_collector import EnhancedDataCollector
+    from analysis.lightgbm_predictor import LightGBMPredictor
+    ENHANCED_FEATURES_AVAILABLE = True
+except ImportError:
+    ENHANCED_FEATURES_AVAILABLE = False
 
 class BitcoinAnalysisBot:
     def __init__(self):
@@ -26,6 +38,18 @@ class BitcoinAnalysisBot:
         self.initialize_components()
         self.running = False
         self.last_alert_time = None  # Track last alert time
+        self.startup_message_sent = False  # Track startup message
+        self.last_enhanced_metrics = {}  # Store last enhanced metrics
+        
+        # Enhanced features
+        if ENHANCED_FEATURES_AVAILABLE:
+            self.enhanced_collector = EnhancedDataCollector()
+            self.lightgbm_predictor = LightGBMPredictor()
+            self.logger.info("🚀 Enhanced features enabled (CryptoBERT + LightGBM)")
+        else:
+            self.enhanced_collector = None
+            self.lightgbm_predictor = None
+            self.logger.info("📊 Running with standard features only")
         
     def setup_logging(self):
         """Setup logging configuration"""
@@ -63,8 +87,8 @@ class BitcoinAnalysisBot:
         self.logger.info("All components initialized")
     
     def collect_data(self):
-        """Collect data from all sources"""
-        self.logger.info("=== Starting Data Collection Cycle ===")
+        """Collect data from all sources including enhanced metrics"""
+        self.logger.info("=== Starting Enhanced Data Collection Cycle ===")
         
         try:
             # Collect price data
@@ -73,15 +97,45 @@ class BitcoinAnalysisBot:
             
             # Collect Reddit data first (always works)
             self.logger.info("Collecting Reddit data...")
-            reddit_stats = self.reddit_collector.collect_and_save(posts_limit=20, comments_limit=10)
+            reddit_stats = self.reddit_collector.collect_and_save(
+                posts_limit=20, 
+                comments_limit=10
+            )
             
-            # Collect Twitter data (may hit rate limits)
+            # Collect Twitter data (skip if rate limited)
             self.logger.info("Collecting Twitter data...")
             try:
-                twitter_stats = self.twitter_collector.collect_and_save(max_results=25)
+                twitter_stats = self.twitter_collector.collect_and_save(
+                    max_results=25
+                )
+                self.logger.info("Twitter collection successful")
             except Exception as e:
-                self.logger.warning(f"Twitter collection failed: {e}")
-                twitter_stats = None
+                if "Rate limit" in str(e) or "Sleeping for" in str(e):
+                    self.logger.warning(
+                        "Twitter rate limited - skipping for this cycle"
+                    )
+                    twitter_stats = None
+                else:
+                    self.logger.warning(f"Twitter collection failed: {e}")
+                    twitter_stats = None
+            
+            # Collect enhanced metrics if available
+            enhanced_metrics = {}
+            if self.enhanced_collector:
+                self.logger.info("Collecting enhanced market metrics...")
+                try:
+                    # Get recent price data for correlations
+                    recent_prices = self.price_collector.get_recent_prices(days=5)
+                    enhanced_metrics = self.enhanced_collector.collect_all_metrics(
+                        btc_prices=recent_prices
+                    )
+                    self.last_enhanced_metrics = enhanced_metrics  # Store for analysis
+                    self.logger.info(
+                        f"✅ Enhanced metrics collected: {len(enhanced_metrics)} indicators"
+                    )
+                except Exception as e:
+                    self.logger.warning(f"Enhanced metrics collection failed: {e}")
+                    enhanced_metrics = {}
             
             # Log collection summary
             total_social_posts = 0
@@ -90,12 +144,16 @@ class BitcoinAnalysisBot:
             if reddit_stats:
                 total_social_posts += reddit_stats.get('saved_entries', 0)
                 
-            self.logger.info(f"Data collection complete - Social posts: {total_social_posts}")
+            self.logger.info(
+                f"Data collection complete - Social posts: {total_social_posts}, "
+                f"Enhanced metrics: {len(enhanced_metrics)}"
+            )
             
             return {
                 'price': price_stats,
                 'twitter': twitter_stats,
                 'reddit': reddit_stats,
+                'enhanced_metrics': enhanced_metrics,
                 'total_social_posts': total_social_posts
             }
             
@@ -104,28 +162,61 @@ class BitcoinAnalysisBot:
             return None
     
     def perform_analysis(self):
-        """Perform sentiment and technical analysis"""
-        self.logger.info("=== Starting Analysis Cycle ===")
+        """Perform enhanced sentiment and technical analysis"""
+        self.logger.info("=== Starting Enhanced Analysis Cycle ===")
         
         try:
-            # Perform sentiment analysis
-            self.logger.info("Performing sentiment analysis...")
-            sentiment_summary = self.sentiment_analyzer.generate_sentiment_summary(hours=24)
+            # Perform sentiment analysis (now using CryptoBERT if available)
+            self.logger.info("Performing advanced sentiment analysis...")
+            sentiment_summary = self.sentiment_analyzer.generate_sentiment_summary(
+                hours=24
+            )
             
             # Perform technical analysis
             self.logger.info("Performing technical analysis...")
-            technical_summary = self.technical_analyzer.perform_full_analysis(days=30)
+            technical_summary = self.technical_analyzer.perform_full_analysis(
+                days=30
+            )
             
-            # Generate predictions
-            self.logger.info("Generating price predictions...")
+            # Generate standard predictions
+            self.logger.info("Generating standard price predictions...")
             prediction_report = self.predictor.generate_prediction_report()
+            
+            # Generate LightGBM predictions if available
+            lightgbm_prediction = None
+            if self.lightgbm_predictor:
+                self.logger.info("Generating LightGBM price direction prediction...")
+                try:
+                    # Get recent price and sentiment data for LightGBM
+                    recent_prices = self.price_collector.get_recent_prices(days=60)
+                    recent_sentiment = self.sentiment_analyzer.get_recent_sentiment_data(hours=1440)  # 60 days
+                    
+                    lightgbm_prediction = self.lightgbm_predictor.predict_next_direction(
+                        price_data=recent_prices,
+                        sentiment_data=recent_sentiment
+                    )
+                    
+                    if lightgbm_prediction:
+                        self.logger.info(
+                            f"LightGBM prediction: {lightgbm_prediction['direction_text']} "
+                            f"(confidence: {lightgbm_prediction['confidence']:.3f})"
+                        )
+                    else:
+                        self.logger.warning("LightGBM prediction failed")
+                        
+                except Exception as e:
+                    self.logger.error(f"LightGBM prediction failed: {e}")
+                    lightgbm_prediction = None
             
             # Create comprehensive analysis report
             analysis_report = {
                 'timestamp': datetime.utcnow(),
                 'sentiment': sentiment_summary,
                 'technical': technical_summary,
-                'predictions': prediction_report
+                'predictions': prediction_report,
+                'lightgbm_prediction': lightgbm_prediction,
+                'enhanced_metrics': self.last_enhanced_metrics,
+                'price_data': self._get_current_price_data()
             }
             
             self.logger.info("Analysis cycle complete")
@@ -142,6 +233,163 @@ class BitcoinAnalysisBot:
         except Exception as e:
             self.logger.error(f"Error in analysis: {e}")
             return None
+    
+    def _get_current_price_data(self):
+        """Get current price data for analysis report"""
+        try:
+            current_price = self.price_collector.get_current_price()
+            # Simple implementation - could be enhanced with 24h change calculation
+            return {
+                'current_price': current_price,
+                'price_change_24h': 0  # Placeholder - would need historical comparison
+            }
+        except Exception as e:
+            self.logger.error(f"Error getting current price data: {e}")
+            return {
+                'current_price': None,
+                'price_change_24h': 0
+            }
+
+    def _prepare_lightgbm_data(self):
+        """Prepare data for LightGBM prediction"""
+        try:
+            # Get recent price data
+            price_data = self.price_collector.get_recent_prices(days=60)
+            if price_data is None or price_data.empty:
+                return None
+            
+            # Get recent sentiment data  
+            sentiment_data = self.sentiment_analyzer.get_recent_sentiment_data(
+                hours=24*60  # 60 days
+            )
+            
+            # Convert sentiment data to daily aggregates
+            if sentiment_data:
+                import pandas as pd
+                
+                sentiment_df = pd.DataFrame([{
+                    'date': item.timestamp.date(),
+                    'sentiment': item.sentiment_score
+                } for item in sentiment_data])
+                
+                # Group by date and take mean
+                sentiment_daily = sentiment_df.groupby('date')['sentiment'].mean()
+                sentiment_daily = sentiment_daily.to_frame().reset_index()
+                sentiment_daily.set_index('date', inplace=True)
+            else:
+                sentiment_daily = pd.DataFrame()
+            
+            # Prepare features using LightGBM predictor
+            if self.lightgbm_predictor:
+                features_df = self.lightgbm_predictor.prepare_features(
+                    price_data, 
+                    sentiment_daily
+                )
+                return features_df
+            
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Failed to prepare LightGBM data: {e}")
+            return None
+    
+    def generate_enhanced_alert(self, analysis_report, collection_stats):
+        """Generate enhanced alert with CryptoBERT and LightGBM insights"""
+        try:
+            # Get current price
+            current_price = self.price_collector.get_current_price()
+            if current_price is None:
+                current_price = 0.0
+            
+            # Base alert info
+            alert_parts = [
+                "🤖 Enhanced Bitcoin Analysis Alert",
+                f"💰 Current Price: ${current_price:,.2f}",
+                f"📊 Time: {datetime.now().strftime('%Y-%m-%d %H:%M UTC')}"
+            ]
+            
+            # Handle None analysis_report
+            if analysis_report is None:
+                analysis_report = {}
+            
+            # Sentiment analysis (enhanced with CryptoBERT)
+            sentiment = analysis_report.get('sentiment', {})
+            if sentiment:
+                sentiment_score = sentiment.get('overall_score', 0)
+                emoji = "🟢" if sentiment_score > 0.1 else "🔴" if sentiment_score < -0.1 else "🟡"
+                
+                # Check if CryptoBERT was used
+                analyzer = getattr(self, 'sentiment_analyzer', None)
+                if analyzer and hasattr(analyzer, 'use_advanced') and analyzer.use_advanced:
+                    alert_parts.append(f"{emoji} CryptoBERT Sentiment: {sentiment_score:.3f}")
+                else:
+                    alert_parts.append(f"{emoji} Sentiment: {sentiment_score:.3f}")
+            
+            # LightGBM prediction
+            if 'lightgbm_prediction' in analysis_report:
+                lgb_pred = analysis_report['lightgbm_prediction']
+                if lgb_pred and isinstance(lgb_pred, dict):
+                    direction = lgb_pred.get('direction', 0)
+                    direction_emoji = "⬆️" if direction == 1 else "⬇️"
+                    direction_text = lgb_pred.get('direction_text', 'Unknown')
+                    confidence = lgb_pred.get('confidence', 0)
+                    
+                    alert_parts.append(
+                        f"🧠 LightGBM: {direction_emoji} {direction_text} "
+                        f"(Conf: {confidence:.1%})"
+                    )
+            
+            # Enhanced metrics
+            if collection_stats is None:
+                collection_stats = {}
+            
+            enhanced_metrics = collection_stats.get('enhanced_metrics', {})
+            if enhanced_metrics:
+                # Fear & Greed
+                if 'fear_greed_value' in enhanced_metrics:
+                    fg_value = enhanced_metrics['fear_greed_value']
+                    fg_class = enhanced_metrics.get('fear_greed_class', 'Unknown')
+                    alert_parts.append(f"😨 Fear & Greed: {fg_value} ({fg_class})")
+                
+                # StockTwits sentiment
+                if 'stocktwits_sentiment' in enhanced_metrics:
+                    st_sentiment = enhanced_metrics['stocktwits_sentiment']
+                    st_emoji = "🟢" if st_sentiment > 0.1 else "🔴" if st_sentiment < -0.1 else "🟡"
+                    alert_parts.append(f"{st_emoji} StockTwits: {st_sentiment:.3f}")
+            
+            # Technical analysis
+            technical = analysis_report.get('technical', {})
+            if technical:
+                trend = technical.get('trend', 'Unknown')
+                trend_emoji = "📈" if trend == "Bullish" else "📉" if trend == "Bearish" else "➡️"
+                alert_parts.append(f"{trend_emoji} Technical: {trend}")
+            
+            # Data collection stats
+            social_posts = collection_stats.get('total_social_posts', 0)
+            enhanced_count = len(enhanced_metrics) if enhanced_metrics else 0
+            alert_parts.append(f"📱 Social: {social_posts} | Enhanced: {enhanced_count}")
+            
+            return "\n".join(alert_parts)
+            
+        except Exception as e:
+            self.logger.error(f"Error generating enhanced alert: {e}")
+            return self.generate_fallback_alert(analysis_report, collection_stats)
+    
+    def generate_fallback_alert(self, analysis_report, collection_stats):
+        """Generate basic alert if enhanced features fail"""
+        try:
+            current_price = self.price_collector.get_current_price()
+            sentiment = analysis_report.get('sentiment', {})
+            sentiment_score = sentiment.get('overall_score', 0)
+            
+            return (
+                f"🤖 Bitcoin Analysis Alert\n"
+                f"💰 Price: ${current_price:,.2f}\n"
+                f"📊 Sentiment: {sentiment_score:.3f}\n"
+                f"⏰ {datetime.now().strftime('%Y-%m-%d %H:%M UTC')}"
+            )
+        except:
+            return "🤖 Bitcoin Analysis Alert - Data temporarily unavailable"
     
     def log_key_insights(self, analysis_report):
         """Log key insights from analysis"""
@@ -167,6 +415,12 @@ class BitcoinAnalysisBot:
                     self.logger.info(f"PREDICTION (24h): ${pred_24h['predicted_price']:.2f} "
                                    f"({pred_24h['price_change_pct']:+.2f}%, "
                                    f"{pred_24h['confidence']:.2f} confidence)")
+                    
+            # LightGBM prediction insights
+            if analysis_report.get('lightgbm_prediction'):
+                lg_prediction = analysis_report['lightgbm_prediction']
+                self.logger.info(f"LIGHTGBM PREDICTION: {lg_prediction['direction_text']} "
+                               f"(Confidence: {lg_prediction['confidence']:.2f})")
                     
         except Exception as e:
             self.logger.error(f"Error logging insights: {e}")
@@ -280,13 +534,13 @@ class BitcoinAnalysisBot:
             self.logger.error(f"Failed to start web server: {e}")
     
     def send_telegram_alert(self, analysis_report, alert_type="UPDATE"):
-        """Send Telegram alert with analysis results"""
+        """Send enhanced Telegram alert with neural network analysis"""
         try:
             if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
                 return False
                 
-            # Create alert message with type
-            alert_message = create_alert_message(analysis_report, alert_type)
+            # Always use enhanced alert since we have advanced features integrated
+            alert_message = create_enhanced_alert_message(analysis_report, alert_type)
             
             # Send to Telegram
             success = send_telegram_message(alert_message)
@@ -480,9 +734,16 @@ class BitcoinAnalysisBot:
                 
                 if recent_sentiment:
                     # Calculate average sentiment
-                    avg_sentiment = sum(s.compound_score for s in recent_sentiment) / len(recent_sentiment)
-                    sentiment_emoji = "🚀" if avg_sentiment > 0.1 else "📉" if avg_sentiment < -0.1 else "😐"
-                    message += f"💭 **Sentiment:** {sentiment_emoji} {avg_sentiment:.3f}\n"
+                    scores = [s.sentiment_score for s in recent_sentiment]
+                    avg_sentiment = sum(scores) / len(scores)
+                    if avg_sentiment > 0.1:
+                        emoji = "�"
+                    elif avg_sentiment < -0.1:
+                        emoji = "📉"
+                    else:
+                        emoji = "😐"
+                    sent_text = f"💭 **Sentiment:** {emoji} {avg_sentiment:.3f}\n"
+                    message += sent_text
                     message += f"📈 **Posts:** {len(recent_sentiment)}\n"
                 else:
                     message += "💭 **Sentiment:** No recent data\n"

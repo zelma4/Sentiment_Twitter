@@ -21,14 +21,14 @@ class TwitterCollector:
     def setup_twitter_client(self):
         """Initialize Twitter API client"""
         try:
-            # Using Twitter API v2
+            # Using Twitter API v2 - NO RATE LIMIT WAITING
             client = tweepy.Client(
                 bearer_token=settings.TWITTER_BEARER_TOKEN,
                 consumer_key=settings.TWITTER_API_KEY,
                 consumer_secret=settings.TWITTER_API_SECRET,
                 access_token=settings.TWITTER_ACCESS_TOKEN,
                 access_token_secret=settings.TWITTER_ACCESS_TOKEN_SECRET,
-                wait_on_rate_limit=True
+                wait_on_rate_limit=False  # Do NOT wait on rate limits
             )
             
             # Test connection
@@ -92,43 +92,51 @@ class TwitterCollector:
             query = ' OR '.join(settings.TWITTER_KEYWORDS)
             query += ' -is:retweet lang:en'  # Exclude retweets, English only
             
-            # Search tweets
-            tweets = tweepy.Paginator(
-                self.client.search_recent_tweets,
-                query=query,
-                tweet_fields=['created_at', 'author_id', 'public_metrics', 'context_annotations'],
-                max_results=min(max_results, 100),  # API limit
-                limit=1
-            ).flatten(limit=max_results)
-            
-            for tweet in tweets:
-                try:
-                    # Analyze sentiment
-                    sentiment_score, sentiment_label = self.analyze_sentiment(tweet.text)
-                    
-                    # Get metrics
-                    metrics = tweet.public_metrics
-                    
-                    tweet_data = {
-                        'post_id': str(tweet.id),
-                        'text': tweet.text,
-                        'sentiment_score': sentiment_score,
-                        'sentiment_label': sentiment_label,
-                        'author': str(tweet.author_id),
-                        'likes': metrics.get('like_count', 0),
-                        'retweets': metrics.get('retweet_count', 0),
-                        'replies': metrics.get('reply_count', 0),
-                        'created_at': tweet.created_at
-                    }
-                    
-                    tweets_data.append(tweet_data)
-                    
-                except Exception as e:
-                    self.logger.error(f"Error processing tweet {tweet.id}: {e}")
-                    continue
-                    
+            # Search tweets with immediate rate limit check
+            try:
+                tweets = tweepy.Paginator(
+                    self.client.search_recent_tweets,
+                    query=query,
+                    tweet_fields=['created_at', 'author_id', 'public_metrics', 'context_annotations'],
+                    max_results=min(max_results, 100),  # API limit
+                    limit=1
+                ).flatten(limit=max_results)
+                
+                for tweet in tweets:
+                    try:
+                        # Analyze sentiment
+                        sentiment_score, sentiment_label = self.analyze_sentiment(tweet.text)
+                        
+                        # Get metrics
+                        metrics = tweet.public_metrics
+                        
+                        tweet_data = {
+                            'post_id': str(tweet.id),
+                            'text': tweet.text,
+                            'sentiment_score': sentiment_score,
+                            'sentiment_label': sentiment_label,
+                            'author': str(tweet.author_id),
+                            'likes': metrics.get('like_count', 0),
+                            'replies': metrics.get('reply_count', 0),
+                            'created_at': tweet.created_at
+                        }
+                        
+                        tweets_data.append(tweet_data)
+                        
+                    except Exception as e:
+                        self.logger.error(f"Error processing tweet {tweet.id}: {e}")
+                        continue
+                        
+            except tweepy.TooManyRequests:
+                self.logger.warning("Twitter rate limit exceeded - stopping collection")
+                raise Exception("Rate limit exceeded - skipping Twitter")
+                
+        except tweepy.TooManyRequests:
+            self.logger.warning("Twitter rate limit exceeded")
+            raise Exception("Rate limit exceeded - skipping Twitter")
         except Exception as e:
             self.logger.error(f"Error searching tweets: {e}")
+            raise
             
         self.logger.info(f"Collected {len(tweets_data)} tweets")
         return tweets_data

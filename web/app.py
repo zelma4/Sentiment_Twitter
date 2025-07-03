@@ -18,6 +18,11 @@ def create_app():
         """Full featured dashboard"""
         return render_template('dashboard.html')
     
+    @app.route('/enhanced')
+    def enhanced_dashboard():
+        """Enhanced dashboard with neural network features"""
+        return render_template('dashboard_enhanced.html')
+    
     @app.route('/api/price-data')
     def get_price_data():
         """Get recent price data (limited and optimized)"""
@@ -221,6 +226,88 @@ def create_app():
         finally:
             session.close()
     
+    @app.route('/api/enhanced-metrics')
+    def get_enhanced_metrics():
+        """Get enhanced market metrics including Fear & Greed, correlations, etc."""
+        try:
+            # Import enhanced collector here to avoid circular imports
+            from data_collectors.enhanced_collector import EnhancedDataCollector
+            from data_collectors.price_collector import PriceCollector
+            
+            # Get recent price data for correlations
+            price_collector = PriceCollector()
+            recent_prices = price_collector.get_recent_prices(days=5)
+            
+            # Collect enhanced metrics
+            enhanced_collector = EnhancedDataCollector()
+            metrics = enhanced_collector.collect_all_metrics(recent_prices)
+            
+            return jsonify({
+                'success': True,
+                'data': metrics,
+                'timestamp': datetime.utcnow().isoformat()
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            })
+    
+    @app.route('/api/neural-analysis')
+    def get_neural_analysis():
+        """Get CryptoBERT sentiment and LightGBM predictions"""
+        try:
+            result = {}
+            
+            # Try to get CryptoBERT sentiment
+            try:
+                from analysis.crypto_sentiment import CryptoBERTAnalyzer
+                analyzer = CryptoBERTAnalyzer()
+                
+                # Sample recent texts for analysis
+                test_text = "Bitcoin price action looks bullish with strong support levels"
+                sentiment_result = analyzer.analyze_sentiment(test_text)
+                result['cryptobert_available'] = True
+                result['sample_sentiment'] = sentiment_result
+                
+            except Exception as e:
+                result['cryptobert_available'] = False
+                result['cryptobert_error'] = str(e)
+            
+            # Try to get LightGBM prediction
+            try:
+                from analysis.lightgbm_predictor import LightGBMPredictor
+                from data_collectors.price_collector import PriceCollector
+                
+                price_collector = PriceCollector()
+                recent_prices = price_collector.get_recent_prices(days=10)
+                
+                if len(recent_prices) >= 5:
+                    predictor = LightGBMPredictor()
+                    prediction = predictor.predict_next_direction(recent_prices)
+                    result['lightgbm_available'] = True
+                    result['prediction'] = prediction
+                else:
+                    result['lightgbm_available'] = False
+                    result['lightgbm_error'] = "Insufficient price data"
+                    
+            except Exception as e:
+                result['lightgbm_available'] = False
+                result['lightgbm_error'] = str(e)
+            
+            return jsonify({
+                'success': True,
+                'data': result,
+                'timestamp': datetime.utcnow().isoformat()
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            })
+
     return app
 
 if __name__ == '__main__':

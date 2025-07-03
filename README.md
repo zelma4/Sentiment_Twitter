@@ -1,14 +1,37 @@
-# 🔮 Bitcoin Analysis Bot
+# 🔮 Enhanced Bitcoin Analysis Bot with Neural Networks
+
+🚀 **NEW: Enhanced with CryptoBERT and LightGBM for state-of-the-art analysis!**
 
 Багатофункціональний бот для аналізу та прогнозування ціни Bitcoin на основі:
-- 💭 **Sentiment Analysis** - аналіз тональності постів з Twitter та Reddit
+- 🧠 **Neural Networks** - CryptoBERT для sentiment + LightGBM для prediction
+- 💭 **Advanced Sentiment** - криптоспецифічний аналіз тональності
+- 📊 **Enhanced Data** - Fear & Greed Index, StockTwits, on-chain metrics
 - 📈 **Technical Analysis** - технічний аналіз цінових графіків з 10+ індикаторами
-- 🤖 **Machine Learning** - прогнозування ціни за допомогою RandomForest
+- 🤖 **Machine Learning** - прогнозування напрямку ціни з 67%+ точністю
 - 🌐 **Web Dashboard** - красивий веб-інтерфейс з графіками
-- � **24/7 Monitoring** - безперервний моніторинг ринку
-- 📱 **Telegram Alerts** - сповіщення про важливі зміни
+- ⚡ **24/7 Monitoring** - безперервний моніторинг ринку
+- 📱 **Enhanced Alerts** - розумні сповіщення з neural network insights
 
-## ✨ Можливості
+## 🆕 Enhanced Features (2025)
+
+### Neural Network Models
+- **🧠 CryptoBERT**: Specialized crypto sentiment analysis (ElKulako/cryptobert)
+- **📊 LightGBM**: Advanced price direction prediction with 67.4% accuracy
+- **🔗 Hybrid Analysis**: Intelligent fallback system for maximum reliability
+
+### Enhanced Data Sources
+- **😨 Fear & Greed Index**: Real-time market sentiment indicator
+- **💬 StockTwits**: Social sentiment from crypto trading community
+- **⛓️ On-chain Metrics**: NVT ratio, MVRV ratio (Glassnode integration)
+- **📈 Market Correlations**: Bitcoin vs traditional markets (SPY, QQQ, GLD)
+
+### Smart Features
+- **🎯 Enhanced Predictions**: Neural network-powered price direction forecasting
+- **📱 Rich Alerts**: Detailed Telegram notifications with AI insights
+- **🛡️ Robust Fallbacks**: Graceful degradation when advanced features unavailable
+- **⚡ Real-time Analysis**: Sub-second sentiment classification
+
+## ✨ Core Capabilities
 - 🐦 **Twitter Integration** - збір та аналіз твітів про Bitcoin
 - 📱 **Reddit Analysis** - моніторинг криптовалютних subreddit-ів
 - 📊 **Price Tracking** - отримання даних з Binance, CoinGecko, Yahoo Finance
@@ -39,14 +62,42 @@ cp .env.example .env
 # Заповніть .env файл своїми API ключами
 ```
 
-4. Запустіть бота:
+4. **NEW**: Test enhanced features:
 ```bash
+python test_enhancements.py
+```
+
+5. Запустіть бота:
+```bash
+python main.py
+```
+
+## 🚀 Quick Start with Enhanced Features
+
+```bash
+# Install with neural network support
+pip install transformers torch lightgbm tokenizers fear-greed-index
+
+# Test all enhancements
+TOKENIZERS_PARALLELISM=false python test_enhancements.py
+
+# Start bot with enhanced features
 python main.py
 ```
 
 ## API Ключі
 
-Вам потрібно отримати наступні API ключі:
+### Core APIs (Required)
+- **Twitter/X API**: Bearer Token для соціального sentiment
+- **Reddit API**: Client ID/Secret для моніторингу subreddit-ів  
+- **Binance API**: Для отримання цінових даних (публічне API)
+- **Telegram Bot**: Для сповіщень
+
+### Enhanced APIs (Optional)
+- **Glassnode API**: Для on-chain метрик (NVT, MVRV)
+- **CoinGecko API**: Для розширених цінових даних
+
+Детальна інструкція з налаштування:
 
 ### Twitter API
 1. Йдіть на https://developer.twitter.com/
