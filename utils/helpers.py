@@ -103,43 +103,98 @@ def format_sentiment_score(score):
     
     return f"{score:.3f} ({desc})"
 
-def create_alert_message(analysis_report):
+def create_alert_message(analysis_report, alert_type="UPDATE"):
     """Create formatted alert message"""
     try:
-        message = "🔮 **Bitcoin Analysis Alert**\n\n"
+        # Alert type specific headers
+        if alert_type == "CRITICAL":
+            header = "🚨 **CRITICAL BITCOIN ALERT** 🚨\n\n"
+        elif alert_type == "STARTUP":
+            header = "🤖 **Bitcoin Bot Started** 🤖\n\n"
+        elif alert_type == "SUMMARY":
+            header = "� **Bitcoin Analysis Summary** 📊\n\n"
+        else:
+            header = "🔮 **Bitcoin Analysis Update** 🔮\n\n"
         
-        # Price info
+        message = header
+        
+        # Price info with change indicator
         if analysis_report.get('price_data'):
-            price = analysis_report['price_data'].get('current_price')
+            price_data = analysis_report['price_data']
+            price = price_data.get('current_price')
+            change_24h = price_data.get('price_change_24h', 0)
+            
             if price:
-                message += f"💰 **Current Price:** {format_price(price)}\n"
+                change_symbol = "🔴" if change_24h < 0 else "🟢" if change_24h > 0 else "⚪"
+                message += f"💰 **Price:** {format_price(price)} {change_symbol}\n"
+                if abs(change_24h) > 0.01:
+                    message += f"📈 **24h Change:** {format_percentage(change_24h)}\n"
         
-        # Sentiment info
+        # Sentiment info with context
         if analysis_report.get('sentiment'):
             sentiment = analysis_report['sentiment']['overall']
-            message += f"💭 **Sentiment:** {format_sentiment_score(sentiment['overall_score'])}\n"
-            message += f"📊 **Posts Analyzed:** {sentiment['total_posts']}\n"
+            sentiment_score = sentiment['overall_score']
+            
+            # Sentiment emoji
+            if sentiment_score > 0.5:
+                sentiment_emoji = "😁"
+            elif sentiment_score > 0.2:
+                sentiment_emoji = "😊"
+            elif sentiment_score > -0.2:
+                sentiment_emoji = "😐"
+            elif sentiment_score > -0.5:
+                sentiment_emoji = "😟"
+            else:
+                sentiment_emoji = "😨"
+            
+            message += f"💭 **Sentiment:** {format_sentiment_score(sentiment_score)} {sentiment_emoji}\n"
+            message += f"📊 **Posts:** {sentiment['total_posts']} (Conf: {sentiment.get('confidence', 0):.2f})\n"
         
-        # Technical analysis
+        # Technical analysis with strength
         if analysis_report.get('technical'):
             technical = analysis_report['technical']
-            message += f"📈 **Technical:** {technical['recommendation']}\n"
+            recommendation = technical['recommendation']
+            strength = technical.get('signals', {}).get('strength', 0)
+            
+            # Technical emoji
+            tech_emoji = {
+                'STRONG_BUY': '🚀',
+                'BUY': '📈',
+                'HOLD': '⏸️',
+                'SELL': '📉',
+                'STRONG_SELL': '🔻'
+            }.get(recommendation, '❓')
+            
+            message += f"📈 **Technical:** {recommendation} {tech_emoji}\n"
+            if strength > 0:
+                message += f"🎯 **Strength:** {strength:.2f}/1.0\n"
         
-        # Predictions
+        # Predictions with confidence
         if analysis_report.get('predictions') and analysis_report['predictions'].get('predictions'):
             predictions = analysis_report['predictions']['predictions']
             if '24h' in predictions:
                 pred = predictions['24h']
-                message += f"🔮 **24h Prediction:** {format_price(pred['predicted_price'])}\n"
-                message += f"🎯 **Change:** {format_percentage(pred['price_change_pct'])}\n"
+                confidence = pred.get('confidence', 0)
+                change_pct = pred.get('price_change_pct', 0)
+                
+                direction = "🔺" if change_pct > 0 else "🔻" if change_pct < 0 else "➡️"
+                
+                message += f"🔮 **24h Prediction:** {format_price(pred['predicted_price'])} {direction}\n"
+                message += f"🎯 **Expected Change:** {format_percentage(change_pct)}\n"
+                message += f"🎓 **Confidence:** {confidence:.2f}\n"
         
-        message += f"\n⏰ **Time:** {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC"
+        # Add special notes for critical alerts
+        if alert_type == "CRITICAL":
+            message += "\n⚠️ **This is a critical alert - significant market movement detected!**\n"
+        
+        # Add timestamp
+        message += f"\n⏰ {datetime.utcnow().strftime('%H:%M:%S UTC, %Y-%m-%d')}"
         
         return message
         
     except Exception as e:
         logging.error(f"Error creating alert message: {e}")
-        return "Error creating alert message"
+        return f"Error creating {alert_type} alert message"
 
 def save_analysis_report(report, filename=None):
     """Save analysis report to JSON file"""

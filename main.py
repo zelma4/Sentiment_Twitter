@@ -194,6 +194,9 @@ class BitcoinAnalysisBot:
                 analysis_report = self.perform_analysis()
                 
                 if analysis_report:
+                    # Step 3: Check if we should send alerts
+                    self.check_and_send_alerts(analysis_report)
+                    
                     self.logger.info("✅ Analysis cycle completed successfully")
                 else:
                     self.logger.warning("⚠️ Analysis cycle completed with errors")
@@ -202,13 +205,38 @@ class BitcoinAnalysisBot:
                 
         except Exception as e:
             self.logger.error(f"❌ Error in full cycle: {e}")
+
+    def check_and_send_alerts(self, analysis_report):
+        """Check if alerts should be sent and send them"""
+        try:
+            # Always check for critical alerts first (highest priority)
+            if self.is_critical_alert(analysis_report):
+                if self.should_send_alert(analysis_report, force_alert=False):
+                    self.send_telegram_alert(analysis_report, alert_type="CRITICAL")
+                    self.logger.info("🚨 Critical alert sent")
+                    return
+            
+            # Check for regular updates based on data significance
+            if self.should_send_regular_update(analysis_report):
+                if self.should_send_alert(analysis_report, force_alert=False):
+                    self.send_telegram_alert(analysis_report, alert_type="UPDATE")
+                    self.logger.info("📊 Regular update sent")
+                    return
+            
+            # If no alerts sent but we have data, log the status
+            self.logger.info("📝 Analysis complete - no alerts triggered")
+                    
+        except Exception as e:
+            self.logger.error(f"Error in check_and_send_alerts: {e}")
     
     def setup_scheduler(self):
         """Setup scheduled tasks"""
         self.logger.info("Setting up scheduler...")
         
-        # Data collection and analysis every hour (reduced from 30 min)
-        schedule.every(settings.UPDATE_INTERVAL_MINUTES).minutes.do(self.run_full_cycle)
+        # Data collection and analysis every 10 minutes
+        schedule.every(settings.UPDATE_INTERVAL_MINUTES).minutes.do(
+            self.run_full_cycle
+        )
         
         # Send hourly summary (every 2 hours to avoid spam)
         schedule.every(2).hours.do(self.send_hourly_summary)
@@ -218,11 +246,18 @@ class BitcoinAnalysisBot:
         
         # Initial data collection with historical data
         schedule.every().day.at("01:00").do(
-            lambda: self.price_collector.collect_and_save(include_historical=True, historical_days=7)
+            lambda: self.price_collector.collect_and_save(
+                include_historical=True, 
+                historical_days=7
+            )
         )
         
         self.logger.info("Scheduler configured")
-    
+        self.logger.info(f"✅ Data collection every {settings.UPDATE_INTERVAL_MINUTES} minutes")
+        self.logger.info("✅ Hourly summary every 2 hours")
+        self.logger.info("✅ Critical alerts sent immediately")
+        self.logger.info("✅ Regular alerts sent every 10 minutes (with data)")
+
     def start_web_server(self):
         """Start the web dashboard in a separate thread"""
         try:
@@ -240,21 +275,21 @@ class BitcoinAnalysisBot:
         except Exception as e:
             self.logger.error(f"Failed to start web server: {e}")
     
-    def send_telegram_alert(self, analysis_report):
+    def send_telegram_alert(self, analysis_report, alert_type="UPDATE"):
         """Send Telegram alert with analysis results"""
         try:
             if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
                 return False
                 
-            # Create alert message
-            alert_message = create_alert_message(analysis_report)
+            # Create alert message with type
+            alert_message = create_alert_message(analysis_report, alert_type)
             
             # Send to Telegram
             success = send_telegram_message(alert_message)
             
             if success:
-                self.logger.info("📱 Telegram alert sent successfully")
-                self.last_alert_time = datetime.utcnow()  # Update last alert time
+                self.logger.info(f"📱 Telegram {alert_type} alert sent successfully")
+                self.last_alert_time = datetime.utcnow()
             else:
                 self.logger.warning("📱 Failed to send Telegram alert")
                 
@@ -264,30 +299,53 @@ class BitcoinAnalysisBot:
             self.logger.error(f"Error sending Telegram alert: {e}")
             return False
 
-    def should_send_alert(self, analysis_report):
+    def should_send_alert(self, analysis_report, force_alert=False):
         """Determine if alert should be sent based on analysis"""
         try:
-            # Check if enough time has passed since last alert (1 hour minimum)
+            if force_alert:
+                return True
+            
+            # Check if this is a critical alert - always send critical alerts
+            is_critical = self.is_critical_alert(analysis_report)
+            if is_critical:
+                # For critical alerts, only enforce a 2-minute minimum to prevent spam
+                if self.last_alert_time:
+                    time_since_last = datetime.utcnow() - self.last_alert_time
+                    if time_since_last.total_seconds() < 120:  # 2 minutes minimum for critical
+                        return False
+                return True
+            
+            # For regular alerts, check if enough time has passed
             if self.last_alert_time:
                 time_since_last = datetime.utcnow() - self.last_alert_time
-                if time_since_last.total_seconds() < 3600:  # 1 hour
+                # Regular alerts every 10 minutes (matching our collection cycle)
+                if time_since_last.total_seconds() < 600:  # 10 minutes for regular
                     return False
             
-            # Always send alert for significant price changes
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error in should_send_alert: {e}")
+            return False
+
+    def is_critical_alert(self, analysis_report):
+        """Check if this is a critical alert that should be sent immediately"""
+        try:
+            # Critical price change > 5%
             if analysis_report.get('predictions'):
                 predictions = analysis_report['predictions'].get('predictions', {})
                 if '24h' in predictions:
                     change_pct = predictions['24h'].get('price_change_pct', 0)
-                    if abs(change_pct) > 5:  # >5% change
+                    if abs(change_pct) > 5:  # Critical threshold
                         return True
             
-            # Send alert for extreme sentiment
+            # Critical sentiment (very negative or positive)
             if analysis_report.get('sentiment'):
                 sentiment_score = analysis_report['sentiment']['overall']['overall_score']
-                if sentiment_score < -0.5 or sentiment_score > 0.5:
+                if sentiment_score < -0.7 or sentiment_score > 0.7:  # Very strong sentiment
                     return True
             
-            # Send alert for strong technical signals
+            # Strong technical signals
             if analysis_report.get('technical'):
                 recommendation = analysis_report['technical'].get('recommendation', '')
                 if recommendation in ['STRONG_BUY', 'STRONG_SELL']:
@@ -296,7 +354,48 @@ class BitcoinAnalysisBot:
             return False
             
         except Exception as e:
-            self.logger.error(f"Error checking alert conditions: {e}")
+            self.logger.error(f"Error in is_critical_alert: {e}")
+            return False
+
+    def should_send_regular_update(self, analysis_report):
+        """Check if we should send a regular update"""
+        try:
+            # Always send update if we haven't sent one in 30 minutes
+            if self.last_alert_time:
+                time_since_last = datetime.utcnow() - self.last_alert_time
+                if time_since_last.total_seconds() >= 1800:  # 30 minutes
+                    return True
+            else:
+                # First analysis - always send
+                return True
+            
+            # Send for moderate price changes (2-5%)
+            if analysis_report.get('predictions'):
+                predictions = analysis_report['predictions'].get('predictions', {})
+                if '24h' in predictions:
+                    change_pct = predictions['24h'].get('price_change_pct', 0)
+                    if abs(change_pct) > 2:  # 2-5% change
+                        return True
+            
+            # Send for moderate sentiment changes
+            if analysis_report.get('sentiment'):
+                sentiment_score = analysis_report['sentiment']['overall']['overall_score']
+                confidence = analysis_report['sentiment']['overall'].get('confidence', 0)
+                # Lower threshold if we have high confidence
+                threshold = 0.3 if confidence > 0.7 else 0.4
+                if abs(sentiment_score) > threshold:
+                    return True
+            
+            # Send for any notable technical signals
+            if analysis_report.get('technical'):
+                recommendation = analysis_report['technical'].get('recommendation', '')
+                if recommendation in ['BUY', 'SELL', 'STRONG_BUY', 'STRONG_SELL']:
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            self.logger.error(f"Error in should_send_regular_update: {e}")
             return False
 
     def send_startup_message(self):
@@ -319,12 +418,17 @@ class BitcoinAnalysisBot:
             except FileNotFoundError:
                 pass
                 
-            message = "🚀 **Bitcoin Analysis Bot Started**\n\n"
-            message += "✅ Bot is now running 24/7\n"
-            message += f"⏰ Analysis every {settings.UPDATE_INTERVAL_MINUTES} minutes\n"
-            message += "🔍 Monitoring: Twitter, Reddit, Price data\n"
-            message += f"📊 ML Predictions: {settings.PREDICTION_DAYS} days\n\n"
-            message += "Ready to send alerts for significant changes! 📈📉"
+            message = "🤖 **Bitcoin Analysis Bot Started!**\n\n"
+            message += "✅ **Status:** Running 24/7\n"
+            message += f"⏰ **Data Collection:** Every {settings.UPDATE_INTERVAL_MINUTES} minutes\n"
+            message += f"� **Analysis Updates:** Every 30 minutes\n"
+            message += f"📈 **Sources:** Twitter, Reddit, CoinGecko\n"
+            message += f"� **ML Predictions:** {settings.PREDICTION_DAYS} days ahead\n\n"
+            message += "**📱 Alert Types:**\n"
+            message += "🚨 Critical: Price >5%, Strong signals\n"
+            message += "📊 Regular: Price >2%, Sentiment changes\n"
+            message += "⏰ Summary: Every 2 hours\n\n"
+            message += "Ready to monitor Bitcoin markets! �"
             
             success = send_telegram_message(message)
             
@@ -416,9 +520,6 @@ class BitcoinAnalysisBot:
         # Run initial cycle
         self.logger.info("Running initial analysis cycle...")
         self.run_full_cycle()
-        
-        # Send startup message
-        self.send_startup_message()
         
         # Start scheduled tasks
         self.running = True
