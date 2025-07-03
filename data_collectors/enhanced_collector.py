@@ -160,7 +160,21 @@ class StockTwitsCollector:
             url = f"{self.base_url}/streams/symbol/{symbol}.json"
             params = {'limit': limit}
             
-            response = requests.get(url, params=params, timeout=10)
+            # Add browser-like headers to avoid Cloudflare blocking
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'application/json, text/plain, */*',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Cache-Control': 'max-age=0'
+            }
+            
+            response = requests.get(url, params=params, headers=headers, timeout=10)
             
             if response.status_code == 200:
                 data = response.json()
@@ -182,6 +196,8 @@ class StockTwitsCollector:
                 
                 logger.info(f"✅ Collected {len(messages)} StockTwits messages for {symbol}")
                 return messages
+            else:
+                logger.warning(f"StockTwits API returned status {response.status_code} for {symbol}")
                 
         except Exception as e:
             logger.error(f"Failed to fetch StockTwits data for {symbol}: {e}")
