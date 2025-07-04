@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   bitcoin-sentiment-bot:
     build: .
@@ -11,16 +9,14 @@ services:
       - ./.env:/app/.env
     environment:
       - PYTHONUNBUFFERED=1
+      - TORCH_HOME=/app/data/torch
     networks:
       - bot-network
-    # Uncomment if you want to expose web interface
-    # ports:
-    #   - "8000:8000"
+    mem_limit: 1.5g
+    cpus: 1.5
+    ports:
+      - "8000:8000"  # Expose web dashboard
 
 networks:
   bot-network:
     driver: bridge
-
-volumes:
-  bot-data:
-  bot-logs:

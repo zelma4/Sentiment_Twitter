@@ -36,6 +36,21 @@ def create_app():
                 PriceData.timestamp >= cutoff_time
             ).order_by(PriceData.timestamp.desc()).limit(50).all()
             
+            # If we have less than 3 data points, get more historical data
+            if len(price_data) < 3:
+                # Get last 24 hours of data
+                cutoff_time = datetime.utcnow() - timedelta(hours=24)
+                price_data = session.query(PriceData).filter(
+                    PriceData.timestamp >= cutoff_time
+                ).order_by(PriceData.timestamp.desc()).limit(50).all()
+            
+            # If still not enough, get last 7 days
+            if len(price_data) < 3:
+                cutoff_time = datetime.utcnow() - timedelta(days=7)
+                price_data = session.query(PriceData).filter(
+                    PriceData.timestamp >= cutoff_time
+                ).order_by(PriceData.timestamp.desc()).limit(50).all()
+            
             # Reverse to get chronological order
             price_data = list(reversed(price_data))
             
@@ -71,10 +86,12 @@ def create_app():
             if summary and 'timestamp' in summary:
                 summary['timestamp'] = summary['timestamp'].isoformat()
             
-            # Convert trend timestamps
+            # Convert trend timestamps (they're already strings from SQL strftime)
             if summary and 'trends' in summary and 'hourly_data' in summary['trends']:
                 for item in summary['trends']['hourly_data']:
-                    if 'timestamp' in item:
+                    if ('timestamp' in item and
+                            hasattr(item['timestamp'], 'isoformat')):
+                        # Only convert if it's a datetime object
                         item['timestamp'] = item['timestamp'].isoformat()
             
             return jsonify({
@@ -279,13 +296,16 @@ def create_app():
             try:
                 from analysis.lightgbm_predictor import LightGBMPredictor
                 from data_collectors.price_collector import PriceCollector
+                from analysis.sentiment_analyzer import SentimentAnalyzer
                 
                 price_collector = PriceCollector()
+                sentiment_analyzer = SentimentAnalyzer()
                 recent_prices = price_collector.get_recent_prices(days=10)
+                recent_sentiment = sentiment_analyzer.get_recent_sentiment_dataframe(hours=240)
                 
                 if len(recent_prices) >= 5:
                     predictor = LightGBMPredictor()
-                    prediction = predictor.predict_next_direction(recent_prices)
+                    prediction = predictor.predict_next_direction(recent_prices, recent_sentiment)
                     result['lightgbm_available'] = True
                     result['prediction'] = prediction
                 else:
@@ -310,6 +330,5 @@ def create_app():
 
     return app
 
-if __name__ == '__main__':
-    app = create_app()
-    app.run(debug=True, host='0.0.0.0', port=8000)
+# Note: Flask app is started from main.py in production
+# To run dashboard standalone, use: python run_dashboard.py

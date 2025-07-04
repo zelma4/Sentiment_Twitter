@@ -52,9 +52,21 @@ class LightGBMPredictor:
             DataFrame with engineered features
         """
         # Validate input data
-        if price_data is None or price_data.empty:
+        if price_data is None or (isinstance(price_data, pd.DataFrame) and price_data.empty):
             logger.warning("Empty or None price data provided")
             return pd.DataFrame()
+        
+        # Handle case where price_data is a list (convert to DataFrame)
+        if isinstance(price_data, list):
+            if len(price_data) == 0:
+                logger.warning("Empty price data list provided")
+                return pd.DataFrame()
+            # Convert list to DataFrame (assuming it's a list of dicts)
+            try:
+                price_data = pd.DataFrame(price_data)
+            except Exception as e:
+                logger.error(f"Failed to convert price data list to DataFrame: {e}")
+                return pd.DataFrame()
         
         # Check required columns
         required_cols = ['open', 'high', 'low', 'close', 'volume']

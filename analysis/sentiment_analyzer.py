@@ -4,6 +4,7 @@ from sqlalchemy import func
 from database.models import get_session, SentimentData
 from config.settings import settings
 import statistics
+import pandas as pd
 
 # Try to import advanced sentiment analyzers
 try:
@@ -135,6 +136,49 @@ class SentimentAnalyzer:
             return []
         finally:
             session.close()
+    
+    def get_recent_sentiment_dataframe(self, hours=24):
+        """Get sentiment data as DataFrame for ML models"""
+        recent_data = self.get_recent_sentiment_data(hours)
+        
+        if not recent_data:
+            return pd.DataFrame()
+        
+        # Convert to DataFrame
+        data = []
+        for entry in recent_data:
+            try:
+                # Handle missing confidence field gracefully
+                confidence = getattr(entry, 'confidence', abs(entry.sentiment_score))
+                
+                # Ensure all required fields exist
+                text = getattr(entry, 'text', '')
+                source = getattr(entry, 'source_platform', getattr(entry, 'source', 'unknown'))
+                
+                data.append({
+                    'date': entry.timestamp.date(),
+                    'sentiment': entry.sentiment_score,
+                    'confidence': confidence,
+                    'text': text,
+                    'source': source
+                })
+            except Exception as e:
+                # Skip problematic entries and continue
+                self.logger.warning(f"Skipping sentiment entry due to error: {e}")
+                continue
+        
+        if not data:
+            return pd.DataFrame()
+        
+        df = pd.DataFrame(data)
+        
+        # Group by date and calculate daily averages
+        daily_sentiment = df.groupby('date').agg({
+            'sentiment': 'mean',
+            'confidence': 'mean'
+        }).reset_index()
+        
+        return daily_sentiment
     
     def calculate_overall_sentiment(self, hours=24):
         """Calculate overall sentiment metrics"""

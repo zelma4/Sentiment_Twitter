@@ -9,6 +9,7 @@ import logging
 import schedule
 import time
 import asyncio
+import traceback
 from datetime import datetime, timedelta
 from config.settings import settings
 from database.models import create_database
@@ -28,9 +29,13 @@ import threading
 try:
     from data_collectors.enhanced_collector import EnhancedDataCollector
     from analysis.lightgbm_predictor import LightGBMPredictor
+    # Web dashboard
+    from web.app import create_app
     ENHANCED_FEATURES_AVAILABLE = True
-except ImportError:
+    WEB_DASHBOARD_AVAILABLE = True
+except ImportError as e:
     ENHANCED_FEATURES_AVAILABLE = False
+    WEB_DASHBOARD_AVAILABLE = False
 
 class BitcoinAnalysisBot:
     def __init__(self):
@@ -84,7 +89,31 @@ class BitcoinAnalysisBot:
         self.technical_analyzer = TechnicalAnalyzer()
         self.predictor = BitcoinPredictor()
         
+        # Initialize web dashboard
+        if WEB_DASHBOARD_AVAILABLE:
+            self.start_web_dashboard()
+        
         self.logger.info("All components initialized")
+    
+    def start_web_dashboard(self):
+        """Start web dashboard in a separate thread"""
+        def run_dashboard():
+            try:
+                self.logger.info("🌐 Starting web dashboard on port 8000...")
+                app = create_app()
+                app.run(
+                    host='0.0.0.0',
+                    port=8000,
+                    debug=False,
+                    threaded=True,
+                    use_reloader=False
+                )
+            except Exception as e:
+                self.logger.error(f"Web dashboard failed to start: {e}")
+        
+        dashboard_thread = threading.Thread(target=run_dashboard, daemon=True)
+        dashboard_thread.start()
+        self.logger.info("📊 Web dashboard thread started")
     
     def collect_data(self):
         """Collect data from all sources including enhanced metrics"""
@@ -189,7 +218,10 @@ class BitcoinAnalysisBot:
                 try:
                     # Get recent price and sentiment data for LightGBM
                     recent_prices = self.price_collector.get_recent_prices(days=60)
-                    recent_sentiment = self.sentiment_analyzer.get_recent_sentiment_data(hours=1440)  # 60 days
+                    self.logger.debug(f"LightGBM: Retrieved {len(recent_prices) if hasattr(recent_prices, '__len__') else 'N/A'} price records")
+                    
+                    recent_sentiment = self.sentiment_analyzer.get_recent_sentiment_dataframe(hours=1440)  # 60 days
+                    self.logger.debug(f"LightGBM: Retrieved sentiment DataFrame with shape {recent_sentiment.shape if hasattr(recent_sentiment, 'shape') else 'N/A'}")
                     
                     lightgbm_prediction = self.lightgbm_predictor.predict_next_direction(
                         price_data=recent_prices,
@@ -206,6 +238,9 @@ class BitcoinAnalysisBot:
                         
                 except Exception as e:
                     self.logger.error(f"LightGBM prediction failed: {e}")
+                    self.logger.debug(
+                        f"LightGBM error traceback: {traceback.format_exc()}"
+                    )
                     lightgbm_prediction = None
             
             # Create comprehensive analysis report
@@ -238,10 +273,10 @@ class BitcoinAnalysisBot:
         """Get current price data for analysis report"""
         try:
             current_price = self.price_collector.get_current_price()
-            # Simple implementation - could be enhanced with 24h change calculation
+            # Simple implementation - could be enhanced with 24h change
             return {
                 'current_price': current_price,
-                'price_change_24h': 0  # Placeholder - would need historical comparison
+                'price_change_24h': 0  # Placeholder - would need historical data
             }
         except Exception as e:
             self.logger.error(f"Error getting current price data: {e}")
@@ -516,23 +551,6 @@ class BitcoinAnalysisBot:
         self.logger.info("✅ Critical alerts sent immediately")
         self.logger.info("✅ Regular alerts sent every 10 minutes (with data)")
 
-    def start_web_server(self):
-        """Start the web dashboard in a separate thread"""
-        try:
-            from web.app import create_app
-            app = create_app()
-            
-            def run_server():
-                app.run(host=settings.HOST, port=settings.PORT, debug=False)
-            
-            web_thread = threading.Thread(target=run_server, daemon=True)
-            web_thread.start()
-            
-            self.logger.info(f"Web server started on http://{settings.HOST}:{settings.PORT}")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to start web server: {e}")
-    
     def send_telegram_alert(self, analysis_report, alert_type="UPDATE"):
         """Send enhanced Telegram alert with neural network analysis"""
         try:
@@ -776,9 +794,6 @@ class BitcoinAnalysisBot:
         # Initial setup
         self.setup_scheduler()
         
-        # Start web server
-        self.start_web_server()
-        
         # Send startup message to Telegram
         self.send_startup_message()
         
@@ -789,7 +804,9 @@ class BitcoinAnalysisBot:
         # Start scheduled tasks
         self.running = True
         self.logger.info("🔄 Bot is now running 24/7")
-        self.logger.info(f"⏰ Next analysis in {settings.UPDATE_INTERVAL_MINUTES} minutes")
+        next_analysis_msg = (f"⏰ Next analysis in "
+                           f"{settings.UPDATE_INTERVAL_MINUTES} minutes")
+        self.logger.info(next_analysis_msg)
         
         try:
             while self.running:
