@@ -85,19 +85,20 @@ class RedditCollector:
             
         return avg_sentiment, label
     
-    def is_bitcoin_related(self, text):
-        """Check if text is Bitcoin related"""
-        bitcoin_keywords = [
-            'bitcoin', 'btc', 'crypto', 'cryptocurrency', 'satoshi',
-            'blockchain', 'hodl', 'moon', 'diamond hands', 'bull market',
-            'bear market', 'dip', 'ath', 'all time high'
+    def is_crypto_related(self, text):
+        """Check if text is crypto related"""
+        crypto_keywords = [
+            'ethereum', 'eth', 'bitcoin', 'btc', 'crypto', 'cryptocurrency', 
+            'satoshi', 'vitalik', 'blockchain', 'hodl', 'moon', 'diamond hands', 
+            'bull market', 'bear market', 'dip', 'ath', 'all time high',
+            'defi', 'smart contracts', 'gas fees', 'ethereum 2.0', 'staking'
         ]
         
         text_lower = text.lower()
-        return any(keyword in text_lower for keyword in bitcoin_keywords)
+        return any(keyword in text_lower for keyword in crypto_keywords)
     
     def collect_posts(self, limit=50):
-        """Collect posts from Bitcoin-related subreddits"""
+        """Collect posts from crypto-related subreddits"""
         if not self.reddit:
             self.logger.error("Reddit client not available")
             return []
@@ -118,8 +119,8 @@ class RedditCollector:
                         # Combine title and selftext
                         full_text = f"{post.title} {post.selftext if post.selftext else ''}"
                         
-                        # Check if Bitcoin related (for general crypto subreddits)
-                        if subreddit_name in ['CryptoCurrency', 'investing'] and not self.is_bitcoin_related(full_text):
+                        # Check if crypto related (for general crypto subreddits)
+                        if subreddit_name in ['CryptoCurrency', 'investing'] and not self.is_crypto_related(full_text):
                             continue
                         
                         # Analyze sentiment

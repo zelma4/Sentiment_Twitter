@@ -61,7 +61,7 @@ class PriceCollector:
                 'timestamp': datetime.utcnow()
             }
             
-            self.logger.info(f"Binance BTC price: ${price_data['price']:.2f}")
+            self.logger.info(f"Binance {settings.SYMBOL} price: ${price_data['price']:.2f}")
             return price_data
             
         except Exception as e:
@@ -69,11 +69,13 @@ class PriceCollector:
             return None
     
     def get_current_price_coingecko(self):
-        """Get current Bitcoin price from CoinGecko"""
+        """Get current crypto price from CoinGecko"""
         try:
+            coin_id = settings.COINGECKO_ID
+            
             url = f"{self.coingecko_url}/simple/price"
             params = {
-                'ids': 'bitcoin',
+                'ids': coin_id,
                 'vs_currencies': 'usd',
                 'include_market_cap': 'true',
                 'include_24hr_vol': 'true',
@@ -86,7 +88,7 @@ class PriceCollector:
             response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()
             
-            data = response.json()['bitcoin']
+            data = response.json()[coin_id]
             
             price_data = {
                 'price': data['usd'],
@@ -95,7 +97,7 @@ class PriceCollector:
                 'timestamp': datetime.utcnow()
             }
             
-            self.logger.info(f"CoinGecko BTC price: ${price_data['price']:.2f}")
+            self.logger.info(f"CoinGecko {settings.SYMBOL} price: ${price_data['price']:.2f}")
             return price_data
             
         except Exception as e:
@@ -169,7 +171,9 @@ class PriceCollector:
     def get_market_data_coingecko(self, days=30):
         """Get comprehensive market data from CoinGecko"""
         try:
-            url = f"{self.coingecko_url}/coins/bitcoin/market_chart"
+            coin_id = settings.COINGECKO_ID
+            
+            url = f"{self.coingecko_url}/coins/{coin_id}/market_chart"
             params = {
                 'vs_currency': 'usd',
                 'days': days,
@@ -355,7 +359,7 @@ class PriceCollector:
             session.close()
     
     def get_current_price(self):
-        """Get current Bitcoin price (tries Binance first, then CoinGecko)"""
+        """Get current crypto price (tries Binance first, then CoinGecko)"""
         try:
             # Try Binance first
             binance_data = self.get_current_price_binance()

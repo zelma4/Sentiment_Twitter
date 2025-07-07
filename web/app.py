@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from database.models import get_session, PriceData, SentimentData, TechnicalAnalysis, Predictions
 from analysis.sentiment_analyzer import SentimentAnalyzer
 from analysis.technical_analyzer import TechnicalAnalyzer
+from config.settings import settings
 import json
 
 def create_app():
@@ -11,17 +12,23 @@ def create_app():
     @app.route('/')
     def dashboard():
         """Main dashboard page (lightweight version)"""
-        return render_template('dashboard_simple.html')
+        return render_template('dashboard_simple.html', 
+                             crypto_name=settings.CRYPTO_NAME,
+                             crypto_symbol=settings.SYMBOL)
     
     @app.route('/full')
     def full_dashboard():
         """Full featured dashboard"""
-        return render_template('dashboard.html')
+        return render_template('dashboard.html',
+                             crypto_name=settings.CRYPTO_NAME,
+                             crypto_symbol=settings.SYMBOL)
     
     @app.route('/enhanced')
     def enhanced_dashboard():
         """Enhanced dashboard with neural network features"""
-        return render_template('dashboard_enhanced.html')
+        return render_template('dashboard_enhanced.html',
+                             crypto_name=settings.CRYPTO_NAME,
+                             crypto_symbol=settings.SYMBOL)
     
     @app.route('/api/price-data')
     def get_price_data():
