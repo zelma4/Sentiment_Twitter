@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
 """
 Bitcoin Analysis Bot
-Multi-functional bot for Bitcoin sentiment analysis, technical analysis, and price prediction.
-Enhanced with CryptoBERT, LightGBM, and additional data sources.
+Multi-functional bot for Bitcoin sentiment analysis,
+technical analysis, and price prediction.
+Enhanced with advanced ML features.
 """
 
 import logging
 import schedule
-import time
-import asyncio
 import traceback
+import os
 from datetime import datetime, timedelta
 from config.settings import settings
 from database.models import create_database
 from data_collectors.twitter_collector import TwitterCollector
 from data_collectors.reddit_collector import RedditCollector
 from data_collectors.price_collector import PriceCollector
-from analysis.sentiment_analyzer import SentimentAnalyzer
+from analysis.advanced_sentiment import AdvancedSentimentAnalyzer
 from analysis.technical_analyzer import TechnicalAnalyzer
 from analysis.predictor import BitcoinPredictor
 from utils.helpers import (
-    send_telegram_message, 
+    send_telegram_message,
     create_enhanced_alert_message
 )
 import threading
@@ -29,13 +29,22 @@ import threading
 try:
     from data_collectors.enhanced_collector import EnhancedDataCollector
     from analysis.lightgbm_predictor import LightGBMPredictor
+    from analysis.advanced_predictor import AdvancedCryptoPredictor
+    from signal_analyzer import analyze_current_signals
     # Web dashboard
     from web.app import create_app
     ENHANCED_FEATURES_AVAILABLE = True
     WEB_DASHBOARD_AVAILABLE = True
-except ImportError as e:
+    ADVANCED_NEURAL_AVAILABLE = True
+    MULTI_HORIZON_AVAILABLE = True
+    SIGNAL_ANALYSIS_AVAILABLE = True
+except ImportError:
     ENHANCED_FEATURES_AVAILABLE = False
     WEB_DASHBOARD_AVAILABLE = False
+    ADVANCED_NEURAL_AVAILABLE = False
+    MULTI_HORIZON_AVAILABLE = False
+    SIGNAL_ANALYSIS_AVAILABLE = False
+
 
 class BitcoinAnalysisBot:
     def __init__(self):
@@ -55,6 +64,23 @@ class BitcoinAnalysisBot:
             self.enhanced_collector = None
             self.lightgbm_predictor = None
             self.logger.info("📊 Running with standard features only")
+        
+        # Advanced neural predictor
+        if ADVANCED_NEURAL_AVAILABLE:
+            self.advanced_predictor = AdvancedCryptoPredictor()
+            self.logger.info("🧠 Advanced neural predictor enabled (CNN-LSTM + Attention)")
+        else:
+            self.advanced_predictor = None
+        
+        # Multi-horizon system
+        if MULTI_HORIZON_AVAILABLE and ADVANCED_NEURAL_AVAILABLE:
+            from analysis.multi_horizon import setup_multi_horizon_system
+            self.multi_horizon_predictor, self.auto_retrain_manager = setup_multi_horizon_system(self)
+            if self.multi_horizon_predictor:
+                self.logger.info("🕐 Multi-horizon prediction system enabled")
+        else:
+            self.multi_horizon_predictor = None
+            self.auto_retrain_manager = None
         
     def setup_logging(self):
         """Setup logging configuration"""
@@ -85,7 +111,7 @@ class BitcoinAnalysisBot:
         self.price_collector = PriceCollector()
         
         # Initialize analyzers
-        self.sentiment_analyzer = SentimentAnalyzer()
+        self.sentiment_analyzer = AdvancedSentimentAnalyzer()
         self.technical_analyzer = TechnicalAnalyzer()
         self.predictor = BitcoinPredictor()
         
@@ -218,10 +244,10 @@ class BitcoinAnalysisBot:
                 try:
                     # Get recent price and sentiment data for LightGBM
                     recent_prices = self.price_collector.get_recent_prices(days=60)
-                    self.logger.debug(f"LightGBM: Retrieved {len(recent_prices) if hasattr(recent_prices, '__len__') else 'N/A'} price records")
+                    self.logger.info(f"LightGBM: Retrieved {len(recent_prices) if hasattr(recent_prices, '__len__') else 'N/A'} price records");
                     
                     recent_sentiment = self.sentiment_analyzer.get_recent_sentiment_dataframe(hours=1440)  # 60 days
-                    self.logger.debug(f"LightGBM: Retrieved sentiment DataFrame with shape {recent_sentiment.shape if hasattr(recent_sentiment, 'shape') else 'N/A'}")
+                    self.logger.info(f"LightGBM: Retrieved sentiment DataFrame with shape {recent_sentiment.shape if hasattr(recent_sentiment, 'shape') else 'N/A'}");
                     
                     lightgbm_prediction = self.lightgbm_predictor.predict_next_direction(
                         price_data=recent_prices,
@@ -234,7 +260,7 @@ class BitcoinAnalysisBot:
                             f"(confidence: {lightgbm_prediction['confidence']:.3f})"
                         )
                     else:
-                        self.logger.warning("LightGBM prediction failed")
+                        self.logger.warning("LightGBM prediction failed - no result returned")
                         
                 except Exception as e:
                     self.logger.error(f"LightGBM prediction failed: {e}")
@@ -242,6 +268,75 @@ class BitcoinAnalysisBot:
                         f"LightGBM error traceback: {traceback.format_exc()}"
                     )
                     lightgbm_prediction = None
+            else:
+                self.logger.warning("LightGBM predictor not available")
+            
+            # Generate Advanced Neural Network predictions if available
+            advanced_prediction = None
+            if self.advanced_predictor:
+                self.logger.info("Generating Advanced Neural Network predictions...")
+                try:
+                    advanced_prediction = self.generate_advanced_prediction()
+                    
+                    if advanced_prediction:
+                        self.logger.info(
+                            f"Advanced Neural: {advanced_prediction['direction_text']} "
+                            f"(confidence: {advanced_prediction['confidence']:.3f})"
+                        )
+                    else:
+                        self.logger.warning("Advanced Neural prediction failed - no result returned")
+                        
+                except Exception as e:
+                    self.logger.error(f"Advanced Neural prediction failed: {e}")
+                    self.logger.debug(
+                        f"Advanced Neural error traceback: {traceback.format_exc()}"
+                    )
+                    advanced_prediction = None
+            else:
+                self.logger.info("Advanced Neural predictor not available")
+            
+            # Generate Multi-Horizon predictions if available
+            multi_horizon_predictions = None
+            if self.multi_horizon_predictor:
+                self.logger.info("Generating Multi-Horizon predictions...")
+                try:
+                    # Get recent data for multi-horizon prediction
+                    recent_prices = self.price_collector.get_recent_prices(days=30)
+                    recent_sentiment = self.sentiment_analyzer.get_recent_sentiment_dataframe(hours=30*24)
+                    
+                    recent_data = {
+                        'price_data': recent_prices,
+                        'sentiment_data': recent_sentiment
+                    }
+                    
+                    multi_horizon_predictions = self.multi_horizon_predictor.predict_all_horizons(recent_data)
+                    
+                    if multi_horizon_predictions:
+                        # Get consensus prediction
+                        consensus = self.multi_horizon_predictor.get_consensus_prediction(multi_horizon_predictions)
+                        self.logger.info(
+                            f"Multi-Horizon Consensus: {consensus['consensus']} "
+                            f"(agreement: {consensus['agreement']:.2f})"
+                        )
+                    else:
+                        self.logger.warning("Multi-Horizon prediction failed")
+                        
+                except Exception as e:
+                    self.logger.error(f"Multi-Horizon prediction failed: {e}")
+                    multi_horizon_predictions = None
+            
+            # Signal analysis - new addition
+            signal_analysis = None
+            if SIGNAL_ANALYSIS_AVAILABLE:
+                self.logger.info("Analyzing current signals...")
+                try:
+                    signal_analysis = analyze_current_signals()
+                    self.logger.info(f"Signal analysis completed: {signal_analysis}")
+                except Exception as e:
+                    self.logger.error(f"Signal analysis failed: {e}")
+                    signal_analysis = None
+            else:
+                self.logger.info("Signal analysis not available")
             
             # Create comprehensive analysis report
             analysis_report = {
@@ -250,8 +345,11 @@ class BitcoinAnalysisBot:
                 'technical': technical_summary,
                 'predictions': prediction_report,
                 'lightgbm_prediction': lightgbm_prediction,
+                'advanced_prediction': advanced_prediction,
+                'multi_horizon_predictions': multi_horizon_predictions,
                 'enhanced_metrics': self.last_enhanced_metrics,
-                'price_data': self._get_current_price_data()
+                'price_data': self._get_current_price_data(),
+                'signal_analysis': signal_analysis  # Add signal analysis to report
             }
             
             self.logger.info("Analysis cycle complete")
@@ -374,6 +472,29 @@ class BitcoinAnalysisBot:
                         f"(Conf: {confidence:.1%})"
                     )
             
+            # Advanced Neural Network prediction
+            if 'advanced_prediction' in analysis_report:
+                adv_pred = analysis_report['advanced_prediction']
+                if adv_pred and isinstance(adv_pred, dict):
+                    direction = adv_pred.get('direction', 0)
+                    direction_emoji = "⬆️" if direction == 2 else "⬇️" if direction == 0 else "➡️"
+                    direction_text = adv_pred.get('direction_text', 'Unknown')
+                    confidence = adv_pred.get('confidence', 0)
+                    
+                    alert_parts.append(
+                        f"🤖 Neural Net: {direction_emoji} {direction_text} "
+                        f"(Conf: {confidence:.1%})"
+                    )
+                    
+                    # Add probability distribution for high confidence predictions
+                    if confidence > 0.7:
+                        probs = adv_pred.get('probabilities', {})
+                        if probs:
+                            alert_parts.append(
+                                f"📊 Probabilities: ⬆️{probs.get('UP', 0):.1%} "
+                                f"➡️{probs.get('HOLD', 0):.1%} ⬇️{probs.get('DOWN', 0):.1%}"
+                            )
+            
             # Enhanced metrics
             if collection_stats is None:
                 collection_stats = {}
@@ -456,6 +577,19 @@ class BitcoinAnalysisBot:
                 lg_prediction = analysis_report['lightgbm_prediction']
                 self.logger.info(f"LIGHTGBM PREDICTION: {lg_prediction['direction_text']} "
                                f"(Confidence: {lg_prediction['confidence']:.2f})")
+            
+            # Advanced Neural Network prediction insights
+            if analysis_report.get('advanced_prediction'):
+                adv_prediction = analysis_report['advanced_prediction']
+                self.logger.info(f"ADVANCED NEURAL PREDICTION: {adv_prediction['direction_text']} "
+                               f"(Confidence: {adv_prediction['confidence']:.2f})")
+                    
+                # Log probability distribution
+                probs = adv_prediction.get('probabilities', {})
+                if probs:
+                    self.logger.info(f"Probability Distribution - UP: {probs.get('UP', 0):.2f}, "
+                                   f"HOLD: {probs.get('HOLD', 0):.2f}, "
+                                   f"DOWN: {probs.get('DOWN', 0):.2f}")
                     
         except Exception as e:
             self.logger.error(f"Error logging insights: {e}")
@@ -531,11 +665,18 @@ class BitcoinAnalysisBot:
             self.run_full_cycle
         )
         
+        # Force first analysis after 1 minute (to ensure LightGBM runs quickly)
+        schedule.every(1).minutes.do(self.run_full_cycle).tag('initial')
+        
         # Send hourly summary (every 2 hours to avoid spam)
         schedule.every(2).hours.do(self.send_hourly_summary)
         
         # Model retraining every week
         schedule.every().sunday.at("02:00").do(self.retrain_model_weekly)
+        
+        # Advanced neural network training (weekly)
+        if self.advanced_predictor:
+            self.schedule_advanced_training()
         
         # Initial data collection with historical data
         schedule.every().day.at("01:00").do(
@@ -547,6 +688,7 @@ class BitcoinAnalysisBot:
         
         self.logger.info("Scheduler configured")
         self.logger.info(f"✅ Data collection every {settings.UPDATE_INTERVAL_MINUTES} minutes")
+        self.logger.info("✅ Initial analysis in 1 minute")
         self.logger.info("✅ Hourly summary every 2 hours")
         self.logger.info("✅ Critical alerts sent immediately")
         self.logger.info("✅ Regular alerts sent every 10 minutes (with data)")
@@ -790,6 +932,7 @@ class BitcoinAnalysisBot:
     def run(self):
         """Main run method"""
         self.logger.info("🚀 Bitcoin Analysis Bot Starting Up")
+        self.logger.info(f"📊 Analysis Symbol: {settings.SYMBOL} ({settings.CRYPTO_NAME})")
         
         # Initial setup
         self.setup_scheduler()
@@ -804,13 +947,34 @@ class BitcoinAnalysisBot:
         # Start scheduled tasks
         self.running = True
         self.logger.info("🔄 Bot is now running 24/7")
+        self.logger.info(f"⏰ Scheduler jobs: {len(schedule.jobs)}")
+        for job in schedule.jobs:
+            self.logger.info(f"   - {job}")
+        
         next_analysis_msg = (f"⏰ Next analysis in "
                            f"{settings.UPDATE_INTERVAL_MINUTES} minutes")
         self.logger.info(next_analysis_msg)
         
         try:
             while self.running:
+                # Run pending scheduled tasks
+                pending_count = len(schedule.get_jobs())
+                if pending_count > 0:
+                    self.logger.debug(f"Checking {pending_count} scheduled jobs...")
+                
                 schedule.run_pending()
+                
+                # Remove initial task after it runs
+                if schedule.get_jobs('initial'):
+                    # Check if initial task has run (more than 1 minute has passed)
+                    import time
+                    if hasattr(self, 'start_time'):
+                        if time.time() - self.start_time > 70:  # 70 seconds
+                            schedule.clear('initial')
+                            self.logger.info("✅ Initial analysis task completed and removed")
+                    else:
+                        self.start_time = time.time()
+                
                 time.sleep(60)  # Check every minute
                 
         except KeyboardInterrupt:
@@ -825,6 +989,134 @@ class BitcoinAnalysisBot:
         self.logger.info("Stopping Bitcoin Analysis Bot...")
         self.running = False
 
+    def generate_advanced_prediction(self):
+        """Generate prediction using advanced neural network (CNN-LSTM with attention)"""
+        try:
+            # Get recent data for prediction
+            recent_prices = self.price_collector.get_recent_prices(days=90)
+            if recent_prices is None or len(recent_prices) < 60:
+                self.logger.warning("Not enough price data for advanced prediction")
+                return None
+            
+            # Get recent sentiment data
+            recent_sentiment = self.sentiment_analyzer.get_recent_sentiment_dataframe(
+                hours=90*24  # 90 days
+            )
+            
+            # Engineer features for advanced model
+            features_data = self.advanced_predictor.engineer_features(
+                price_data=recent_prices,
+                sentiment_data=recent_sentiment,
+                enhanced_data=self.last_enhanced_metrics
+            )
+            
+            if features_data is None or features_data.empty:
+                self.logger.warning("Failed to engineer features for advanced prediction")
+                return None
+            
+            # Check if model needs training or retraining
+            if not self.check_advanced_model_ready():
+                self.logger.info("Advanced model not ready, attempting to train...")
+                if self.train_advanced_model():
+                    self.logger.info("Advanced model training completed")
+                else:
+                    self.logger.warning("Advanced model training failed")
+                    return None
+            
+            # Make prediction
+            prediction = self.advanced_predictor.predict(
+                features_data.drop(columns=['target'] if 'target' in features_data.columns else []),
+                return_attention=True
+            )
+            
+            return prediction
+            
+        except Exception as e:
+            self.logger.error(f"Advanced prediction failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+    
+    def check_advanced_model_ready(self):
+        """Check if advanced model is trained and ready for prediction"""
+        try:
+            # Check if model file exists
+            model_path = 'models/advanced_crypto_model.pth'
+            if not os.path.exists(model_path):
+                return False
+            
+            # Try to load model
+            if self.advanced_predictor.model is None:
+                return self.advanced_predictor.load_model(model_path)
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error checking advanced model: {e}")
+            return False
+    
+    def train_advanced_model(self):
+        """Train the advanced neural network model"""
+        try:
+            self.logger.info("🧠 Starting advanced neural network training...")
+            
+            # Get historical data for training
+            price_data = self.price_collector.get_recent_prices(days=365)  # 1 year
+            if price_data is None or len(price_data) < 200:
+                self.logger.error("Not enough historical data for training")
+                return False
+            
+            # Get sentiment data
+            sentiment_data = self.sentiment_analyzer.get_recent_sentiment_dataframe(
+                hours=365*24  # 1 year
+            )
+            
+            # Engineer features
+            features_data = self.advanced_predictor.engineer_features(
+                price_data=price_data,
+                sentiment_data=sentiment_data,
+                enhanced_data=self.last_enhanced_metrics
+            )
+            
+            if features_data is None or features_data.empty:
+                self.logger.error("Failed to engineer features for training")
+                return False
+            
+            # Train model
+            success = self.advanced_predictor.train_model(
+                features_data=features_data,
+                epochs=50,  # Reduced for faster training
+                batch_size=32,
+                learning_rate=0.001
+            )
+            
+            if success:
+                self.logger.info("✅ Advanced neural network training completed successfully")
+                return True
+            else:
+                self.logger.error("❌ Advanced neural network training failed")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Advanced model training error: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def schedule_advanced_training(self):
+        """Schedule periodic retraining of advanced model"""
+        try:
+            self.logger.info("🕐 Scheduling advanced model retraining...")
+            
+            # Train once per week on Sundays at 2 AM
+            schedule.every().sunday.at("02:00").do(self.train_advanced_model)
+            
+            self.logger.info("Advanced model retraining scheduled for Sundays at 2 AM")
+            
+        except Exception as e:
+            self.logger.error(f"Error scheduling advanced training: {e}")
+
+    # ...existing code...
 def main():
     """Main entry point"""
     print("🔮 Bitcoin Analysis Bot v1.0")

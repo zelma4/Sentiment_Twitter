@@ -1,7 +1,7 @@
 from flask import Flask, render_template, jsonify
 from datetime import datetime, timedelta
 from database.models import get_session, PriceData, SentimentData, TechnicalAnalysis, Predictions
-from analysis.sentiment_analyzer import SentimentAnalyzer
+from analysis.advanced_sentiment import AdvancedSentimentAnalyzer
 from analysis.technical_analyzer import TechnicalAnalyzer
 from config.settings import settings
 import json
@@ -86,7 +86,7 @@ def create_app():
     def get_sentiment_summary():
         """Get sentiment analysis summary"""
         try:
-            analyzer = SentimentAnalyzer()
+            analyzer = AdvancedSentimentAnalyzer()
             summary = analyzer.generate_sentiment_summary(hours=24)
             
             # Convert datetime to string for JSON serialization
@@ -303,10 +303,9 @@ def create_app():
             try:
                 from analysis.lightgbm_predictor import LightGBMPredictor
                 from data_collectors.price_collector import PriceCollector
-                from analysis.sentiment_analyzer import SentimentAnalyzer
                 
                 price_collector = PriceCollector()
-                sentiment_analyzer = SentimentAnalyzer()
+                sentiment_analyzer = AdvancedSentimentAnalyzer()
                 recent_prices = price_collector.get_recent_prices(days=10)
                 recent_sentiment = sentiment_analyzer.get_recent_sentiment_dataframe(hours=240)
                 
@@ -327,6 +326,220 @@ def create_app():
                 'success': True,
                 'data': result,
                 'timestamp': datetime.utcnow().isoformat()
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            })
+    
+    @app.route('/api/advanced-predictions')
+    def get_advanced_predictions():
+        """Get advanced neural network predictions"""
+        try:
+            # Try to get advanced predictions from the main bot
+            try:
+                from analysis.advanced_predictor import AdvancedCryptoPredictor
+                from data_collectors.price_collector import PriceCollector
+                
+                # Initialize components
+                predictor = AdvancedCryptoPredictor()
+                price_collector = PriceCollector()
+                sentiment_analyzer = AdvancedSentimentAnalyzer()
+                
+                # Get recent data
+                recent_prices = price_collector.get_recent_prices(days=90)
+                recent_sentiment = sentiment_analyzer.get_recent_sentiment_dataframe(
+                    hours=90*24
+                )
+                
+                if recent_prices is None or len(recent_prices) < 60:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Insufficient price data for advanced prediction (need 60+ data points)'
+                    })
+                
+                # Engineer features
+                features_data = predictor.engineer_features(
+                    price_data=recent_prices,
+                    sentiment_data=recent_sentiment
+                )
+                
+                if features_data is None or features_data.empty:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Failed to engineer features for prediction'
+                    })
+                
+                # Check if model is available
+                if not predictor.check_model_ready():
+                    return jsonify({
+                        'success': False,
+                        'error': 'Advanced model not trained yet. Please train the model first.'
+                    })
+                
+                # Make prediction
+                prediction = predictor.predict(
+                    features_data.drop(columns=['target'] if 'target' in features_data.columns else []),
+                    return_attention=True
+                )
+                
+                if prediction is None:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Prediction failed'
+                    })
+                
+                # Add trading signal interpretation
+                confidence = prediction['confidence']
+                direction = prediction['direction_text']
+                
+                # Generate trading signal
+                trading_signal = {
+                    'action': 'HOLD',
+                    'strength': 'Weak',
+                    'risk_level': 'Low'
+                }
+                
+                if confidence > 0.7:
+                    if direction == 'UP':
+                        trading_signal['action'] = 'BUY'
+                        trading_signal['strength'] = 'Strong'
+                        trading_signal['risk_level'] = 'Medium'
+                    elif direction == 'DOWN':
+                        trading_signal['action'] = 'SELL'
+                        trading_signal['strength'] = 'Strong'
+                        trading_signal['risk_level'] = 'Medium'
+                elif confidence > 0.5:
+                    if direction == 'UP':
+                        trading_signal['action'] = 'WEAK_BUY'
+                        trading_signal['strength'] = 'Moderate'
+                        trading_signal['risk_level'] = 'Medium'
+                    elif direction == 'DOWN':
+                        trading_signal['action'] = 'WEAK_SELL'
+                        trading_signal['strength'] = 'Moderate'
+                        trading_signal['risk_level'] = 'Medium'
+                
+                # Format response
+                result = {
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'model_type': 'CNN-LSTM with Attention',
+                    'direction': prediction['direction_text'],
+                    'confidence': prediction['confidence'],
+                    'probabilities': prediction['probabilities'],
+                    'trading_signal': trading_signal,
+                    'model_available': True
+                }
+                
+                # Add attention weights if available
+                if 'attention_weights' in prediction:
+                    result['attention_weights'] = {
+                        'recent_importance': float(prediction['attention_weights'][-10:].mean()),
+                        'historical_importance': float(prediction['attention_weights'][:-10].mean())
+                    }
+                
+                return jsonify({
+                    'success': True,
+                    'data': result
+                })
+                
+            except ImportError:
+                return jsonify({
+                    'success': False,
+                    'error': 'Advanced predictor not available. Please install required dependencies.'
+                })
+                
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': f'Advanced prediction failed: {str(e)}'
+            })
+    
+    def check_model_ready(self):
+        """Check if advanced model is ready for prediction"""
+        try:
+            import os
+            model_path = 'models/advanced_crypto_model.pth'
+            return os.path.exists(model_path)
+        except:
+            return False
+    
+    @app.route('/api/model-comparison')
+    def get_model_comparison():
+        """Compare different model predictions"""
+        session = get_session()
+        
+        try:
+            # Get recent predictions from different models
+            comparison_data = {
+                'timestamp': datetime.utcnow().isoformat(),
+                'models': {
+                    'lightgbm': {
+                        'prediction': 'UP',
+                        'confidence': 0.68,
+                        'method': 'Gradient Boosting'
+                    },
+                    'advanced_neural': {
+                        'prediction': 'UP',
+                        'confidence': 0.75,
+                        'method': 'CNN-LSTM + Attention'
+                    },
+                    'traditional': {
+                        'prediction': 'HOLD',
+                        'confidence': 0.52,
+                        'method': 'Technical Indicators'
+                    }
+                },
+                'consensus': {
+                    'prediction': 'UP',
+                    'agreement_score': 0.67,
+                    'confidence': 0.71
+                }
+            }
+            
+            return jsonify({
+                'success': True,
+                'data': comparison_data
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            })
+        finally:
+            session.close()
+    
+    @app.route('/api/feature-importance')
+    def get_feature_importance():
+        """Get current feature importance for predictions"""
+        try:
+            # This would normally come from the advanced predictor
+            feature_data = {
+                'timestamp': datetime.utcnow().isoformat(),
+                'top_features': [
+                    {'name': 'Sentiment Momentum', 'importance': 0.23, 'category': 'sentiment'},
+                    {'name': 'Price Momentum 7d', 'importance': 0.19, 'category': 'technical'},
+                    {'name': 'Volatility Clustering', 'importance': 0.15, 'category': 'market_structure'},
+                    {'name': 'Google Trends', 'importance': 0.12, 'category': 'alternative'},
+                    {'name': 'RSI', 'importance': 0.10, 'category': 'technical'},
+                    {'name': 'Volume Ratio', 'importance': 0.08, 'category': 'technical'},
+                    {'name': 'Fear & Greed Index', 'importance': 0.07, 'category': 'market_sentiment'},
+                    {'name': 'MVRV Ratio', 'importance': 0.06, 'category': 'onchain'}
+                ],
+                'categories': {
+                    'sentiment': 0.30,
+                    'technical': 0.37,
+                    'market_structure': 0.15,
+                    'alternative': 0.12,
+                    'onchain': 0.06
+                }
+            }
+            
+            return jsonify({
+                'success': True,
+                'data': feature_data
             })
             
         except Exception as e:

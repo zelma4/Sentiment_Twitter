@@ -1,221 +1,238 @@
-# 🔮 Enhanced Bitcoin Analysis Bot with Neural Networks
+# 🚀 Bitcoin Sentiment Analysis Bot
 
-🚀 **NEW: Enhanced with CryptoBERT and LightGBM for state-of-the-art analysis!**
+Advanced Bitcoin sentiment analysis and prediction bot with ML features.
 
-Багатофункціональний бот для аналізу та прогнозування ціни Bitcoin на основі:
-- 🧠 **Neural Networks** - CryptoBERT для sentiment + LightGBM для prediction
-- 💭 **Advanced Sentiment** - криптоспецифічний аналіз тональності
-- 📊 **Enhanced Data** - Fear & Greed Index, StockTwits, on-chain metrics
-- 📈 **Technical Analysis** - технічний аналіз цінових графіків з 10+ індикаторами
-- 🤖 **Machine Learning** - прогнозування напрямку ціни з 67%+ точністю
-- 🌐 **Web Dashboard** - красивий веб-інтерфейс з графіками
-- ⚡ **24/7 Monitoring** - безперервний моніторинг ринку
-- 📱 **Enhanced Alerts** - розумні сповіщення з neural network insights
+## ✨ Features
 
-## 🆕 Enhanced Features (2025)
+### Core Features
+- **Real-time Data Collection**: Twitter, Reddit, CoinGecko price data
+- **Advanced Sentiment Analysis**: RoBERTa/FinBERT models with VADER fallback
+- **Technical Analysis**: 20+ indicators using TA-Lib
+- **Price Prediction**: Multiple ML models (Random Forest, LightGBM, CNN-LSTM)
+- **Multi-Horizon Predictions**: 1h, 4h, 24h forecasts with consensus
+- **Telegram Alerts**: Smart alerts based on sentiment + technical signals
 
-### Neural Network Models
-- **🧠 CryptoBERT**: Specialized crypto sentiment analysis (ElKulako/cryptobert)
-- **📊 LightGBM**: Advanced price direction prediction with 67.4% accuracy
-- **🔗 Hybrid Analysis**: Intelligent fallback system for maximum reliability
+### Advanced ML Features
+- **Neural Networks**: CNN-LSTM with attention mechanism
+- **Feature Engineering**: Advanced features based on research
+- **Feature Selection**: Boruta algorithm for optimal features
+- **Model Explanability**: SHAP values for interpretability
+- **Auto-Retraining**: Models retrain every 48h automatically
+- **Backtesting**: PnL analysis, Sharpe ratio, drawdown metrics
 
-### Enhanced Data Sources
-- **😨 Fear & Greed Index**: Real-time market sentiment indicator
-- **💬 StockTwits**: Social sentiment from crypto trading community
-- **⛓️ On-chain Metrics**: NVT ratio, MVRV ratio (Glassnode integration)
-- **📈 Market Correlations**: Bitcoin vs traditional markets (SPY, QQQ, GLD)
+### Data Sources
+- **Social Media**: Twitter API v2, Reddit PRAW
+- **Market Data**: CoinGecko, real-time price feeds
+- **Enhanced Metrics**: Fear & Greed Index, Google Trends, StockTwits
+- **On-chain Data**: Integration ready for blockchain metrics
 
-### Smart Features
-- **🎯 Enhanced Predictions**: Neural network-powered price direction forecasting
-- **📱 Rich Alerts**: Detailed Telegram notifications with AI insights
-- **🛡️ Robust Fallbacks**: Graceful degradation when advanced features unavailable
-- **⚡ Real-time Analysis**: Sub-second sentiment classification
+## 🏗️ Architecture
 
-## ✨ Core Capabilities
-- 🐦 **Twitter Integration** - збір та аналіз твітів про Bitcoin
-- 📱 **Reddit Analysis** - моніторинг криптовалютних subreddit-ів
-- 📊 **Price Tracking** - отримання даних з Binance, CoinGecko, Yahoo Finance
-- � **Sentiment Scoring** - оцінка тональності за допомогою VADER + TextBlob
-- 📈 **Technical Indicators** - RSI, MACD, Bollinger Bands, SMA, EMA та інші
-- 🎯 **Price Prediction** - прогнози на 1h, 4h, 24h з рівнем довіри
-- 🌐 **Beautiful Dashboard** - адаптивний веб-дашборд з Chart.js
-- 🔄 **Auto-Retraining** - автоматичне переnavчання ML моделі
-- 📱 **Telegram Bot** - сповіщення та алерти
-- ☁️ **Cloud Ready** - готовий до деплою на Render/Heroku
-
-## Встановлення
-
-1. Клонуйте репозиторій:
-```bash
-git clone <repository-url>
-cd Sentiment_Twitter
+```
+main.py                 # Main bot orchestrator
+├── analysis/
+│   ├── advanced_sentiment.py      # RoBERTa/FinBERT sentiment
+│   ├── advanced_predictor.py      # CNN-LSTM neural network
+│   ├── advanced_feature_engineering.py # Research-based features
+│   ├── lightgbm_predictor.py      # LightGBM model
+│   ├── multi_horizon.py           # Multi-timeframe predictions
+│   ├── backtesting.py             # Strategy backtesting
+│   ├── technical_analyzer.py      # Technical indicators
+│   └── predictor.py               # Base ML predictor
+├── data_collectors/
+│   ├── twitter_collector.py       # Twitter API integration
+│   ├── reddit_collector.py        # Reddit API integration
+│   ├── price_collector.py         # Price data collection
+│   └── enhanced_collector.py      # Additional metrics
+├── web/
+│   ├── app.py                     # Flask dashboard
+│   └── templates/                 # Web UI templates
+├── database/
+│   └── models.py                  # SQLAlchemy models
+└── utils/
+    └── helpers.py                 # Utility functions
 ```
 
-2. Встановіть залежності:
+## 🚀 Quick Start
+
+### 1. Setup Environment
 ```bash
+# Clone repository
+git clone <repo-url>
+cd Sentiment_Twitter
+
+# Create virtual environment
+python -m venv venv_bitcoin
+source venv_bitcoin/bin/activate  # Linux/Mac
+# venv_bitcoin\Scripts\activate   # Windows
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-3. Налаштуйте змінні середовища:
-```bash
-cp .env.example .env
-# Заповніть .env файл своїми API ключами
-```
-
-4. **NEW**: Test enhanced features:
-```bash
-python test_enhancements.py
-```
-
-5. Запустіть бота:
-```bash
-python main.py
-```
-
-## 🚀 Quick Start with Enhanced Features
-
-```bash
-# Install with neural network support
-pip install transformers torch lightgbm tokenizers fear-greed-index
-
-# Test all enhancements
-TOKENIZERS_PARALLELISM=false python test_enhancements.py
-
-# Start bot with enhanced features
-python main.py
-```
-
-## API Ключі
-
-### Core APIs (Required)
-- **Twitter/X API**: Bearer Token для соціального sentiment
-- **Reddit API**: Client ID/Secret для моніторингу subreddit-ів  
-- **Binance API**: Для отримання цінових даних (публічне API)
-- **Telegram Bot**: Для сповіщень
-
-### Enhanced APIs (Optional)
-- **Glassnode API**: Для on-chain метрик (NVT, MVRV)
-- **CoinGecko API**: Для розширених цінових даних
-
-Детальна інструкція з налаштування:
-
-### Twitter API
-1. Йдіть на https://developer.twitter.com/
-2. Створіть додаток
-3. Отримайте Bearer Token та API ключі
-
-### Reddit API
-1. Йдіть на https://www.reddit.com/prefs/apps
-2. Створіть додаток типу "script"
-3. Отримайте Client ID та Client Secret
-
-### Binance API (опціонально)
-1. Реєструйтесь на Binance
-2. Створіть API ключі в налаштуваннях
-3. Дозвольте тільки читання даних
-
-### CoinGecko API
-1. Реєструйтесь на https://www.coingecko.com/en/api
-2. Отримайте безкоштовний API ключ
-
-## Деплой на Render
-
-1. Створіть акаунт на https://render.com/
-2. Підключіть ваш GitHub репозиторій
-3. Встановіть змінні середовища в Render dashboard
-4. Деплойте як Web Service
-
-## Деплой на Digital Ocean
-
-### 1. Створіть Droplet
-- Ubuntu 22.04 LTS
-- Мінімум 2GB RAM (для ML моделей)
-- Додайте SSH ключ
-
-### 2. Деплойте на сервер
-```bash
-# Скопіюйте проект на сервер
-scp -r . root@YOUR_DROPLET_IP:/opt/bitcoin-sentiment-bot
-
-# SSH на сервер
-ssh root@YOUR_DROPLET_IP
-
-# Запустіть скрипт деплою
-cd /opt/bitcoin-sentiment-bot
-chmod +x deploy.sh
-./deploy.sh
-
-# Налаштуйте середовище
-cp .env.example .env
-nano .env  # Додайте свої API ключі
-
-# Запустіть бота
-docker-compose up -d
-```
-
-### 3. Моніторинг
-```bash
-# Перевірте логи
-docker-compose logs -f
-
-# Перевірте статус
-docker-compose ps
-```
-
-## Структура проекту
-```
-Sentiment_Twitter/
-├── main.py                 # Головний файл запуску
-├── config/
-│   └── settings.py         # Налаштування
-├── data_collectors/
-│   ├── twitter_collector.py
-│   ├── reddit_collector.py
-│   └── price_collector.py
-├── analysis/
-│   ├── sentiment_analyzer.py
-│   ├── technical_analyzer.py
-│   └── predictor.py
-├── database/
-│   └── models.py
-├── web/
-│   ├── app.py             # FastAPI додаток
-│   └── templates/
-├── utils/
-│   └── helpers.py
-└── requirements.txt
-```
-
-## Використання
-
-Після запуску бот буде:
-1. Збирати дані кожні 30 хвилин
-2. Аналізувати тональність постів
-3. Проводити технічний аналіз
-4. Генерувати прогнози
-5. Відправляти сповіщення в Telegram
-6. Показувати дані на веб-дашборді (http://localhost:8000)
-
-## 🔧 Налаштування
-
-Ключові змінні середовища в `.env`:
+### 2. Configuration
+Create `.env` file:
 ```env
-TELEGRAM_BOT_TOKEN=your_token
+# Telegram
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
-UPDATE_INTERVAL_HOURS=6
-ENABLE_CRYPTOBERT=true
-ENABLE_LIGHTGBM=true
+
+# Twitter API v2
+TWITTER_BEARER_TOKEN=your_bearer_token
+
+# Reddit API
+REDDIT_CLIENT_ID=your_client_id
+REDDIT_CLIENT_SECRET=your_client_secret
+REDDIT_USER_AGENT=your_user_agent
+
+# Bot Settings
+UPDATE_INTERVAL_MINUTES=10
+CRYPTO_NAME=Bitcoin
+SYMBOL=BTC
+PREDICTION_DAYS=7
 ```
 
-## 📖 Повна документація
+### 3. Run Bot
+```bash
+# Run locally
+python main.py
 
-- [Посібник з деплою на Digital Ocean](DIGITAL_OCEAN_DEPLOYMENT.md)
-- [Налаштування середовища](.env.example)
+# Run with dashboard
+python main.py &  # Bot in background
+# Dashboard available at http://localhost:8000
+```
 
-## 💰 Оцінка вартості
-- Digital Ocean Droplet: $12-24/місяць
-- Загальна місячна вартість: $13-26
+## 🐳 Docker Deployment
+
+```bash
+# Build and run
+docker-compose up -d
+
+# Check status
+docker-compose ps
+
+# View logs
+docker-compose logs -f bitcoin-bot
+```
+
+## 📊 Dashboard
+
+Web dashboard available at `http://localhost:8000` with:
+- Real-time sentiment metrics
+- Price predictions and charts
+- Technical analysis signals
+- Model performance metrics
+- Advanced neural network predictions
+
+## 🔧 Server Management
+
+### Deploy to Server
+```bash
+# Deploy
+./server_deploy.sh
+
+# Check status
+./server_check.sh
+
+# Monitor
+python monitor_bot.py
+
+# Analyze signals
+python signal_analyzer.py
+```
+
+### Train Models
+```bash
+# Initial model training
+python train_server_models.py
+
+# Quick model initialization
+python quick_init_models.py
+```
+
+## 📈 Features Breakdown
+
+### Sentiment Analysis
+- **Models**: RoBERTa, FinBERT, VADER (fallback)
+- **Sources**: Twitter, Reddit, StockTwits
+- **Features**: Momentum, volatility, persistence, reversals
+- **Research-based**: Optimized features from academic research
+
+### ML Models
+1. **Random Forest**: Baseline model
+2. **LightGBM**: Gradient boosting with high performance
+3. **CNN-LSTM**: Deep learning with attention mechanism
+4. **Multi-Horizon**: Ensemble predictions across timeframes
+
+### Technical Analysis
+- **Indicators**: RSI, MACD, Bollinger Bands, SMA/EMA, Volume
+- **Signals**: Automated buy/sell/hold recommendations
+- **Strength**: Signal confidence scoring
+
+### Alert System
+- **Critical Alerts**: >5% price movement, strong sentiment
+- **Regular Updates**: Moderate changes, trend shifts
+- **Hourly Summaries**: Status updates every 2 hours
+- **Smart Timing**: Rate limiting to prevent spam
+
+## 🔬 Research Features
+
+Based on academic research for cryptocurrency prediction:
+- **Sentiment momentum** (highest importance feature)
+- **Compound score** weighting
+- **Negativity bias** correction  
+- **Multi-horizon consensus** for robustness
+- **Feature selection** using Boruta algorithm
+- **Attention mechanisms** for temporal dependencies
+
+## 📝 Log Analysis
+
+```bash
+# View bot logs
+tail -f bitcoin_bot.log
+
+# Check for errors
+grep ERROR bitcoin_bot.log
+
+# Monitor predictions
+grep "PREDICTION" bitcoin_bot.log
+```
+
+## 🔄 Maintenance
+
+### Model Retraining
+- **Automatic**: Every 48 hours
+- **Manual**: Run training scripts
+- **Monitoring**: Check model performance logs
+
+### Data Management
+- **Database**: SQLite (local) or PostgreSQL (production)
+- **Cleanup**: Old data automatically archived
+- **Backup**: Daily backups recommended
+
+## 📊 Performance Metrics
+
+The bot tracks:
+- **Prediction Accuracy**: MAPE, RMSE for price predictions
+- **Sentiment Correlation**: Sentiment vs price movement correlation
+- **Signal Quality**: Precision/recall for trading signals
+- **Model Performance**: Individual model accuracy comparison
+
+## 🚨 Troubleshooting
+
+### Common Issues
+1. **API Rate Limits**: Twitter/Reddit limits handled automatically
+2. **Model Loading**: Neural models require sufficient RAM
+3. **Dependencies**: Ensure all packages in requirements.txt installed
+4. **Database**: Check SQLite permissions and disk space
+
+### Support
+Check logs for detailed error messages and consult documentation.
+
+## 📜 License
+
+This project is for educational and research purposes.
 
 ---
 
-**Статус**: ✅ Готовий до виробництва | Всі нейронні моделі працюють | Розширені функції активні
+**⚠️ Disclaimer**: This bot is for informational purposes only. Do not use for actual trading without proper risk management.**
